@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0] - 2025-12-07
+
+### Added
+- Custom `useImageGenerator` hook for centralized state management
+- Modular component architecture with feature-based organization
+- Blur toggle state persistence to localStorage
+- Project guidance documentation (`CLAUDE.md`)
+
+### Changed
+- **Major refactoring**: Split `ImageGenerator` into modular components
+  - `Header` - App title and branding
+  - `ApiConfigAccordion` - API provider and credentials
+  - `PromptCard` - Prompt input and generation settings
+  - `ImageResultCard` - Image display with floating toolbar
+  - `StatusCard` - Generation status and progress
+- Extracted constants and types to `lib/constants.ts`
+- Reduced main component from 913 to 115 lines (87% reduction)
+- Improved code maintainability and reusability
+
 ## [0.3.0] - 2025-12-06
 
 ### Added
