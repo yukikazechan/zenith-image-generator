@@ -20,8 +20,9 @@ A modern Text-to-Image generation web application with multiple AI providers (Gi
 - Floating toolbar with blur, info, download, delete actions
 - One-click image download (JPG)
 - API key persistence in browser (AES-256-GCM encrypted)
-- Settings persistence in localStorage
+- Settings persistence in localStorage (including blur state)
 - Responsive design (mobile & desktop)
+- Modular component architecture for maintainability
 
 ## Tech Stack
 
@@ -29,6 +30,7 @@ A modern Text-to-Image generation web application with multiple AI providers (Gi
 - **Backend**: Hono (TypeScript)
 - **Deployment**: Cloudflare Pages + Functions
 - **API**: Gitee AI (z-image-turbo)
+- **Architecture**: Custom hooks, modular feature components
 
 ## Project Structure
 
@@ -38,11 +40,16 @@ z-image/
 │   ├── web/                    # Frontend application
 │   │   ├── src/
 │   │   │   ├── pages/          # Page components
-│   │   │   └── components/ui/  # shadcn/ui components
+│   │   │   ├── components/
+│   │   │   │   ├── ui/         # shadcn/ui components
+│   │   │   │   └── feature/    # Feature components (Header, PromptCard, etc.)
+│   │   │   ├── hooks/          # Custom React hooks (useImageGenerator)
+│   │   │   └── lib/            # Utilities (crypto, constants)
 │   │   ├── functions/api/      # Cloudflare Pages Functions
 │   │   └── dist/               # Build output
 │   └── api/                    # Hono API (shared with functions)
 │       └── src/index.ts
+├── CLAUDE.md                   # Project guidance for Claude Code
 ├── package.json
 ├── pnpm-workspace.yaml
 └── turbo.json

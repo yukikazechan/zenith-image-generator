@@ -20,8 +20,9 @@
 - 悬浮工具栏：模糊、信息、下载、删除
 - 一键下载图片 (JPG)
 - API Key 浏览器加密存储 (AES-256-GCM)
-- 设置持久化到 localStorage
+- 设置持久化到 localStorage (包括模糊状态)
 - 响应式设计 (移动端 & 桌面端)
+- 模块化组件架构，易于维护
 
 ## 技术栈
 
@@ -29,6 +30,7 @@
 - **后端**: Hono (TypeScript)
 - **部署**: Cloudflare Pages + Functions
 - **API**: Gitee AI (z-image-turbo)
+- **架构**: 自定义 Hooks、模块化功能组件
 
 ## 项目结构
 
@@ -38,11 +40,16 @@ z-image/
 │   ├── web/                    # 前端应用
 │   │   ├── src/
 │   │   │   ├── pages/          # 页面组件
-│   │   │   └── components/ui/  # shadcn/ui 组件
+│   │   │   ├── components/
+│   │   │   │   ├── ui/         # shadcn/ui 组件
+│   │   │   │   └── feature/    # 功能组件 (Header, PromptCard 等)
+│   │   │   ├── hooks/          # 自定义 React Hooks (useImageGenerator)
+│   │   │   └── lib/            # 工具函数 (crypto, constants)
 │   │   ├── functions/api/      # Cloudflare Pages Functions
 │   │   └── dist/               # 构建输出
 │   └── api/                    # Hono API (与 functions 共享)
 │       └── src/index.ts
+├── CLAUDE.md                   # Claude Code 项目指南
 ├── package.json
 ├── pnpm-workspace.yaml
 └── turbo.json
