@@ -12,11 +12,13 @@ pnpm install
 pnpm dev
 
 # Development (specific apps)
-pnpm dev:web          # Frontend only
-pnpm dev:api          # API only
+pnpm dev:web          # Frontend only (port 5173)
+pnpm dev:api          # API only (port 8787)
 
-# Full stack with Cloudflare Pages (recommended)
-cd apps/web && npx wrangler pages dev --port 5173 -- pnpm dev
+# Local development (recommended: run in two terminals)
+# Terminal 1: pnpm dev:api
+# Terminal 2: pnpm dev:web
+# Note: Set VITE_API_URL=http://localhost:8787 in apps/web/.env
 
 # Build
 pnpm build

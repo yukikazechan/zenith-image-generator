@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.1] - 2025-12-09
+
+### Changed
+- Renamed project to "Zenith Image Generator"
+- Restructured README for cleaner presentation
+- Moved technical details to dedicated docs
+  - `docs/DEPLOYMENT.md` - Deployment guides
+  - `docs/API.md` - API reference and security
+- Added `CONTRIBUTING.md` with local development guide
+- Added LAN access documentation for multi-device testing
+
 ## [0.4.0] - 2025-12-07
 
 ### Added
