@@ -2,10 +2,46 @@
  * ModelScope Provider Implementation
  */
 
+import { Errors } from '@z-image/shared'
 import type { ImageProvider, ProviderGenerateRequest, ProviderGenerateResult } from './types'
 
 interface ModelScopeResponse {
   images?: Array<{ url?: string }>
+}
+
+interface ModelScopeErrorResponse {
+  message?: string
+  error?: string
+  errors?: { message?: string }
+  code?: string
+}
+
+/** Parse ModelScope API error response */
+function parseModelScopeError(status: number, data: ModelScopeErrorResponse): Error {
+  const provider = 'ModelScope'
+  const message = data.errors?.message || data.error || data.message || `HTTP ${status}`
+
+  // Check for authentication errors
+  if (status === 401 || status === 403 || message.toLowerCase().includes('unauthorized') || message.toLowerCase().includes('invalid token')) {
+    return Errors.authInvalid(provider, message)
+  }
+
+  // Check for quota/rate limit errors
+  if (status === 429 || message.toLowerCase().includes('rate limit') || message.toLowerCase().includes('too many')) {
+    return Errors.rateLimited(provider)
+  }
+
+  if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('exceeded') || message.toLowerCase().includes('insufficient')) {
+    return Errors.quotaExceeded(provider)
+  }
+
+  // Check for token expiration
+  if (message.toLowerCase().includes('expired')) {
+    return Errors.authExpired(provider)
+  }
+
+  // Generic provider error
+  return Errors.providerError(provider, message)
 }
 
 export class ModelScopeProvider implements ImageProvider {
@@ -16,17 +52,14 @@ export class ModelScopeProvider implements ImageProvider {
 
   async generate(request: ProviderGenerateRequest): Promise<ProviderGenerateResult> {
     if (!request.authToken) {
-      throw new Error('API Token is required for ModelScope')
+      throw Errors.authRequired('ModelScope')
     }
 
     const token = request.authToken.trim()
 
-    // Debug: log token info (uncomment for debugging)
-    // console.log(`[ModelScope] Token length: ${token.length}`)
     if (token.length < 8) {
-      throw new Error(`Invalid token: too short (${token.length} chars)`)
+      throw Errors.authInvalid('ModelScope', 'Token is too short')
     }
-    // console.log(`[ModelScope] Token format: ${token.slice(0, 4)}...${token.slice(-4)}`)
 
     const sizeString = `${request.width}x${request.height}`
     const body: Record<string, unknown> = {
@@ -41,9 +74,6 @@ export class ModelScopeProvider implements ImageProvider {
       body.guidance = request.guidanceScale
     }
 
-    // Debug: log request (uncomment for debugging)
-    // console.log('[ModelScope] Request:', JSON.stringify({ ...body, prompt: `${body.prompt?.toString().slice(0, 50)}...` }))
-
     const response = await fetch(`${this.baseUrl}/images/generations`, {
       method: 'POST',
       headers: {
@@ -54,24 +84,17 @@ export class ModelScopeProvider implements ImageProvider {
     })
 
     if (!response.ok) {
-      const errData = (await response.json().catch(() => ({}))) as {
-        message?: string
-        errors?: { message?: string }
-      }
-      const errMsg = errData.errors?.message || errData.message || `HTTP ${response.status}`
-      // console.error('[ModelScope] Error response:', errData)
-      throw new Error(errMsg)
+      const errData = (await response.json().catch(() => ({}))) as ModelScopeErrorResponse
+      throw parseModelScopeError(response.status, errData)
     }
 
     const data = (await response.json()) as ModelScopeResponse
     const imageUrl = data.images?.[0]?.url
 
     if (!imageUrl) {
-      // console.error('[ModelScope] Invalid response:', data)
-      throw new Error('No image returned from ModelScope')
+      throw Errors.generationFailed('ModelScope', 'No image returned')
     }
 
-    // console.log(`[ModelScope] Success! Image URL: ${imageUrl.slice(0, 50)}...`)
     return { url: imageUrl, seed: body.seed as number }
   }
 }

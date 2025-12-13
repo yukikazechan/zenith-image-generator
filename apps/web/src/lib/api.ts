@@ -5,7 +5,8 @@
  */
 
 import type {
-  GenerateErrorResponse,
+  ApiErrorCode,
+  ApiErrorResponse,
   GenerateRequest,
   GenerateSuccessResponse,
   UpscaleRequest,
@@ -15,8 +16,57 @@ import { PROVIDER_CONFIGS, type ProviderType } from './constants'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+/** API error with code */
+export interface ApiErrorInfo {
+  message: string
+  code?: ApiErrorCode
+  details?: ApiErrorResponse['details']
+}
+
 /** API response type */
-export type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
+export type ApiResponse<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; errorInfo?: ApiErrorInfo }
+
+/** Parse error response from API */
+function parseErrorResponse(data: unknown): ApiErrorInfo {
+  if (typeof data === 'object' && data !== null) {
+    const errorData = data as ApiErrorResponse
+    return {
+      message: errorData.error || 'Unknown error',
+      code: errorData.code,
+      details: errorData.details,
+    }
+  }
+  return { message: 'Unknown error' }
+}
+
+/** Get user-friendly error message based on error code */
+export function getErrorMessage(errorInfo: ApiErrorInfo): string {
+  const { code, message, details } = errorInfo
+
+  switch (code) {
+    case 'AUTH_REQUIRED':
+      return `Please configure your ${details?.provider || 'API'} token first`
+    case 'AUTH_INVALID':
+      return `Invalid ${details?.provider || 'API'} token. Please check your token and try again.`
+    case 'AUTH_EXPIRED':
+      return `Your ${details?.provider || 'API'} token has expired. Please update it.`
+    case 'RATE_LIMITED':
+      return `Too many requests. Please wait ${details?.retryAfter ? `${details.retryAfter} seconds` : 'a moment'} and try again.`
+    case 'QUOTA_EXCEEDED':
+      return `API quota exceeded for ${details?.provider || 'this provider'}. Please check your account.`
+    case 'INVALID_PROMPT':
+      return message || 'Invalid prompt. Please check your input.'
+    case 'PROVIDER_ERROR':
+    case 'UPSTREAM_ERROR':
+      return details?.upstream || message || 'Provider service error. Please try again.'
+    case 'TIMEOUT':
+      return `Request timed out. ${details?.provider || 'The service'} may be busy. Please try again.`
+    default:
+      return message || 'An error occurred. Please try again.'
+  }
+}
 
 /** Generate image request options */
 export interface GenerateOptions {
@@ -75,8 +125,12 @@ export async function generateImage(
     const data = await response.json()
 
     if (!response.ok) {
-      const errorData = data as GenerateErrorResponse
-      return { success: false, error: errorData.error || 'Failed to generate image' }
+      const errorInfo = parseErrorResponse(data)
+      return {
+        success: false,
+        error: getErrorMessage(errorInfo),
+        errorInfo,
+      }
     }
 
     return { success: true, data: data as GenerateSuccessResponse }
@@ -116,7 +170,12 @@ export async function upscaleImage(
     const data = await response.json()
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to upscale image' }
+      const errorInfo = parseErrorResponse(data)
+      return {
+        success: false,
+        error: getErrorMessage(errorInfo),
+        errorInfo,
+      }
     }
 
     return { success: true, data: data as UpscaleResponse }

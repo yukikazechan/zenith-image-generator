@@ -2,8 +2,42 @@
  * HuggingFace Provider Implementation
  */
 
-import { HF_SPACES } from '@z-image/shared'
+import { Errors, HF_SPACES } from '@z-image/shared'
 import type { ImageProvider, ProviderGenerateRequest, ProviderGenerateResult } from './types'
+
+/** Parse HuggingFace error message */
+function parseHuggingFaceError(message: string, status?: number): Error {
+  const provider = 'HuggingFace'
+  const lowerMsg = message.toLowerCase()
+
+  // Check for rate limit / queue errors
+  if (status === 429 || lowerMsg.includes('rate limit') || lowerMsg.includes('too many requests')) {
+    return Errors.rateLimited(provider)
+  }
+
+  // Check for quota errors
+  if (lowerMsg.includes('quota') || lowerMsg.includes('exceeded')) {
+    return Errors.quotaExceeded(provider)
+  }
+
+  // Check for authentication errors
+  if (status === 401 || status === 403 || lowerMsg.includes('unauthorized') || lowerMsg.includes('forbidden')) {
+    return Errors.authInvalid(provider, message)
+  }
+
+  // Check for timeout
+  if (lowerMsg.includes('timeout') || lowerMsg.includes('timed out')) {
+    return Errors.timeout(provider)
+  }
+
+  // Check for service unavailable
+  if (status === 503 || lowerMsg.includes('unavailable') || lowerMsg.includes('loading')) {
+    return Errors.providerError(provider, 'Service is temporarily unavailable or loading')
+  }
+
+  // Generic provider error
+  return Errors.providerError(provider, message)
+}
 
 /** Extract complete event data from SSE stream */
 function extractCompleteEventData(sseStream: string): unknown {
@@ -24,10 +58,10 @@ function extractCompleteEventData(sseStream: string): unknown {
           const errorData = JSON.parse(jsonData)
           const errorMsg =
             errorData?.error || errorData?.message || JSON.stringify(errorData) || 'Unknown error'
-          throw new Error(errorMsg)
+          throw parseHuggingFaceError(errorMsg)
         } catch (e) {
           if (e instanceof SyntaxError) {
-            throw new Error(jsonData || 'Unknown SSE error')
+            throw parseHuggingFaceError(jsonData || 'Unknown SSE error')
           }
           throw e
         }
@@ -35,17 +69,13 @@ function extractCompleteEventData(sseStream: string): unknown {
     }
   }
   // No complete/error event found, show raw response for debugging
-  throw new Error(`Unexpected SSE response: ${sseStream.substring(0, 300)}`)
+  throw Errors.providerError('HuggingFace', `Unexpected SSE response: ${sseStream.substring(0, 200)}`)
 }
 
 /** Call Gradio API */
 async function callGradioApi(baseUrl: string, endpoint: string, data: unknown[], hfToken?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (hfToken) headers.Authorization = `Bearer ${hfToken}`
-
-  // Debug: log request (uncomment for debugging)
-  // console.log(`[HuggingFace] Calling ${baseUrl}/gradio_api/call/${endpoint}`)
-  // console.log('[HuggingFace] Data:', JSON.stringify(data).slice(0, 200))
 
   const queue = await fetch(`${baseUrl}/gradio_api/call/${endpoint}`, {
     method: 'POST',
@@ -55,24 +85,18 @@ async function callGradioApi(baseUrl: string, endpoint: string, data: unknown[],
 
   if (!queue.ok) {
     const errText = await queue.text().catch(() => '')
-    // console.error(`[HuggingFace] Queue request failed: ${queue.status}`, errText)
-    throw new Error(`Queue request failed: ${queue.status} - ${errText.slice(0, 100)}`)
+    throw parseHuggingFaceError(errText || `Queue request failed: ${queue.status}`, queue.status)
   }
 
   const queueData = (await queue.json()) as { event_id?: string }
   if (!queueData.event_id) {
-    // console.error('[HuggingFace] No event_id in response:', queueData)
-    throw new Error('No event_id returned')
+    throw Errors.providerError('HuggingFace', 'No event_id returned from queue')
   }
-
-  // console.log(`[HuggingFace] Got event_id: ${queueData.event_id}`)
 
   const result = await fetch(`${baseUrl}/gradio_api/call/${endpoint}/${queueData.event_id}`, {
     headers,
   })
   const text = await result.text()
-
-  // console.log(`[HuggingFace] SSE response length: ${text.length}`)
 
   return extractCompleteEventData(text) as unknown[]
 }
@@ -135,11 +159,9 @@ export class HuggingFaceProvider implements ImageProvider {
     const result = data as Array<{ url?: string } | number | string>
     const imageUrl = (result[0] as { url?: string })?.url
     if (!imageUrl) {
-      // console.error('[HuggingFace] Invalid result:', result)
-      throw new Error('No image returned from HuggingFace')
+      throw Errors.generationFailed('HuggingFace', 'No image returned')
     }
 
-    // console.log(`[HuggingFace] Success! URL: ${imageUrl.slice(0, 60)}...`)
     return {
       url: imageUrl,
       seed: parseSeedFromResponse(modelId, result, seed),

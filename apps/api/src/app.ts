@@ -6,6 +6,10 @@
  */
 
 import {
+  ApiError,
+  ApiErrorCode,
+  type ApiErrorResponse,
+  Errors,
   type GenerateRequest,
   type GenerateSuccessResponse,
   type ImageDetails,
@@ -23,7 +27,26 @@ import {
 } from '@z-image/shared'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import type { Context } from 'hono'
 import { getProvider, hasProvider } from './providers'
+
+/** Convert any error to ApiErrorResponse */
+function toApiError(err: unknown): ApiError {
+  if (err instanceof ApiError) {
+    return err
+  }
+  if (err instanceof Error) {
+    return Errors.unknown(err.message)
+  }
+  return Errors.unknown('An unknown error occurred')
+}
+
+/** Send error response */
+function sendError(c: Context, err: unknown): Response {
+  const apiError = toApiError(err)
+  const response: ApiErrorResponse = apiError.toResponse()
+  return c.json(response, apiError.statusCode as 400 | 401 | 429 | 500 | 502 | 504)
+}
 
 /** Extract complete event data from SSE stream */
 function extractCompleteEventData(sseStream: string): unknown {
@@ -149,34 +172,28 @@ export function createApp(config: AppConfig = {}) {
     try {
       body = await c.req.json()
     } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
+      return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
     }
 
     // Determine provider (default to gitee for backward compatibility)
     const providerId = body.provider || 'gitee'
     if (!hasProvider(providerId)) {
-      return c.json({ error: `Invalid provider: ${providerId}` }, 400)
+      return sendError(c, Errors.invalidProvider(providerId))
     }
 
     // Get auth token based on provider
     const providerConfig = PROVIDER_CONFIGS[providerId]
     const authToken = c.req.header(providerConfig?.authHeader || 'X-API-Key')
 
-    // Debug: log token info (uncomment for debugging)
-    // console.log(`[${providerId}] Auth header: ${providerConfig?.authHeader}, Token present: ${!!authToken}, Token length: ${authToken?.length || 0}`)
-
     // Check auth requirement
     if (providerConfig?.requiresAuth && !authToken) {
-      return c.json(
-        { error: `${providerConfig.authHeader} is required for ${providerConfig.name}` },
-        401
-      )
+      return sendError(c, Errors.authRequired(providerConfig.name))
     }
 
     // Validate prompt
     const promptValidation = validatePrompt(body.prompt)
     if (!promptValidation.valid) {
-      return c.json({ error: promptValidation.error }, 400)
+      return sendError(c, Errors.invalidPrompt(promptValidation.error || 'Invalid prompt'))
     }
 
     // Validate dimensions
@@ -184,14 +201,14 @@ export function createApp(config: AppConfig = {}) {
     const height = body.height ?? 1024
     const dimensionsValidation = validateDimensions(width, height)
     if (!dimensionsValidation.valid) {
-      return c.json({ error: dimensionsValidation.error }, 400)
+      return sendError(c, Errors.invalidDimensions(dimensionsValidation.error || 'Invalid dimensions'))
     }
 
     // Validate steps
     const steps = body.steps ?? body.num_inference_steps ?? 9
     const stepsValidation = validateSteps(steps)
     if (!stepsValidation.valid) {
-      return c.json({ error: stepsValidation.error }, 400)
+      return sendError(c, Errors.invalidParams('steps', stepsValidation.error || 'Invalid steps'))
     }
 
     try {
@@ -241,8 +258,7 @@ export function createApp(config: AppConfig = {}) {
       return c.json(response)
     } catch (err) {
       console.error(`${providerId} Error:`, err)
-      const message = err instanceof Error ? err.message : 'Image generation failed'
-      return c.json({ error: message }, 500)
+      return sendError(c, err)
     }
   })
 
@@ -252,13 +268,13 @@ export function createApp(config: AppConfig = {}) {
     try {
       body = await c.req.json()
     } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
+      return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
     }
 
     // Validate prompt
     const promptValidation = validatePrompt(body.prompt)
     if (!promptValidation.valid) {
-      return c.json({ error: promptValidation.error }, 400)
+      return sendError(c, Errors.invalidPrompt(promptValidation.error || 'Invalid prompt'))
     }
 
     const hfToken = c.req.header('X-HF-Token')
@@ -269,7 +285,7 @@ export function createApp(config: AppConfig = {}) {
 
     const dimensionsValidation = validateDimensions(width, height)
     if (!dimensionsValidation.valid) {
-      return c.json({ error: dimensionsValidation.error }, 400)
+      return sendError(c, Errors.invalidDimensions(dimensionsValidation.error || 'Invalid dimensions'))
     }
 
     try {
@@ -315,7 +331,7 @@ export function createApp(config: AppConfig = {}) {
       const response: GenerateSuccessResponse = { imageDetails }
       return c.json(response)
     } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : 'Generation failed' }, 500)
+      return sendError(c, err)
     }
   })
 
@@ -325,15 +341,15 @@ export function createApp(config: AppConfig = {}) {
     try {
       body = await c.req.json()
     } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
+      return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
     }
 
     if (!body.url || typeof body.url !== 'string') {
-      return c.json({ error: 'url is required' }, 400)
+      return sendError(c, Errors.invalidParams('url', 'url is required'))
     }
 
     if (!isAllowedImageUrl(body.url)) {
-      return c.json({ error: 'URL not allowed' }, 400)
+      return sendError(c, Errors.invalidParams('url', 'URL not allowed'))
     }
 
     const hfToken = c.req.header('X-HF-Token')
@@ -341,7 +357,7 @@ export function createApp(config: AppConfig = {}) {
 
     const scaleValidation = validateScale(scale)
     if (!scaleValidation.valid) {
-      return c.json({ error: scaleValidation.error }, 400)
+      return sendError(c, Errors.invalidParams('scale', scaleValidation.error || 'Invalid scale'))
     }
 
     try {
@@ -359,10 +375,12 @@ export function createApp(config: AppConfig = {}) {
       )
       const result = data as Array<{ url?: string }>
       const imageUrl = result[0]?.url
-      if (!imageUrl) return c.json({ error: 'No image returned' }, 500)
+      if (!imageUrl) {
+        return sendError(c, Errors.generationFailed('HuggingFace Upscaler', 'No image returned'))
+      }
       return c.json({ url: imageUrl })
     } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : 'Upscale failed' }, 500)
+      return sendError(c, err)
     }
   })
 
