@@ -1,10 +1,13 @@
 # Dependabot configuration
 # Keeps dependencies up-to-date and checks for security vulnerabilities
+#
+# Note: This is a pnpm monorepo - only monitor root package.json
+# Sub-packages share dependencies via workspace
 
 version: 2
 
 updates:
-  # Root package.json
+  # Root package.json only (monorepo manages all deps)
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
@@ -12,75 +15,34 @@ updates:
       day: 'monday'
       time: '09:00'
       timezone: 'Asia/Shanghai'
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: 'chore(deps):'
     labels:
       - 'dependencies'
-      - 'chore'
     groups:
-      dev-dependencies:
+      # Group all minor/patch updates together
+      all-minor-patch:
         patterns:
-          - '@types/*'
-          - 'vitest'
-          - '@vitest/*'
-          - 'typescript'
-          - '@biomejs/*'
+          - '*'
         update-types:
           - 'minor'
           - 'patch'
-
-  # API package
-  - package-ecosystem: 'npm'
-    directory: '/apps/api'
-    schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '09:00'
-      timezone: 'Asia/Shanghai'
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: 'chore(deps-api):'
-    labels:
-      - 'dependencies'
-      - 'api'
-
-  # Web package
-  - package-ecosystem: 'npm'
-    directory: '/apps/web'
-    schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '09:00'
-      timezone: 'Asia/Shanghai'
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: 'chore(deps-web):'
-    labels:
-      - 'dependencies'
-      - 'web'
-    groups:
-      react:
-        patterns:
-          - 'react'
-          - 'react-dom'
-          - '@types/react*'
-      ui:
-        patterns:
-          - '@radix-ui/*'
-          - 'tailwindcss'
-          - '@tailwindcss/*'
 
   # GitHub Actions
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
+      interval: 'monthly'
       time: '09:00'
       timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 3
     commit-message:
       prefix: 'chore(ci):'
     labels:
       - 'dependencies'
       - 'ci'
+    groups:
+      actions:
+        patterns:
+          - '*'
