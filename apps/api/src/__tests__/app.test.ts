@@ -8,6 +8,57 @@ import { ApiErrorCode } from '@z-image/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app'
 
+// Type definitions for API responses
+interface HealthResponse {
+  status: string
+  message: string
+  timestamp: string
+}
+
+interface Provider {
+  id: string
+  name: string
+  requiresAuth: boolean
+  authHeader: string
+}
+
+interface ProvidersResponse {
+  providers: Provider[]
+}
+
+interface Model {
+  id: string
+  name: string
+  provider: string
+}
+
+interface ModelsResponse {
+  provider?: string
+  models: Model[]
+}
+
+interface ImageDetails {
+  url: string
+  provider: string
+  model: string
+  dimensions: string
+  duration: string
+  seed: number
+  steps: number
+  prompt: string
+  negativePrompt?: string
+}
+
+interface GenerateResponse {
+  imageDetails: ImageDetails
+}
+
+interface ErrorResponse {
+  error: string
+  code: string
+  details?: Record<string, unknown>
+}
+
 describe('API Routes', () => {
   const app = createApp()
 
@@ -25,7 +76,7 @@ describe('API Routes', () => {
       const res = await app.request('/api')
       expect(res.status).toBe(200)
 
-      const json = await res.json()
+      const json = (await res.json()) as HealthResponse
       expect(json.status).toBe('ok')
       expect(json.message).toContain('Z-Image API')
       expect(json.timestamp).toBeDefined()
@@ -37,20 +88,20 @@ describe('API Routes', () => {
       const res = await app.request('/api/providers')
       expect(res.status).toBe(200)
 
-      const json = await res.json()
+      const json = (await res.json()) as ProvidersResponse
       expect(json.providers).toBeInstanceOf(Array)
       expect(json.providers.length).toBeGreaterThan(0)
 
       // Check Gitee provider
-      const gitee = json.providers.find((p: { id: string }) => p.id === 'gitee')
+      const gitee = json.providers.find((p) => p.id === 'gitee')
       expect(gitee).toBeDefined()
-      expect(gitee.requiresAuth).toBe(true)
-      expect(gitee.authHeader).toBe('X-API-Key')
+      expect(gitee?.requiresAuth).toBe(true)
+      expect(gitee?.authHeader).toBe('X-API-Key')
 
       // Check HuggingFace provider
-      const hf = json.providers.find((p: { id: string }) => p.id === 'huggingface')
+      const hf = json.providers.find((p) => p.id === 'huggingface')
       expect(hf).toBeDefined()
-      expect(hf.requiresAuth).toBe(false)
+      expect(hf?.requiresAuth).toBe(false)
     })
   })
 
@@ -59,7 +110,7 @@ describe('API Routes', () => {
       const res = await app.request('/api/providers/gitee/models')
       expect(res.status).toBe(200)
 
-      const json = await res.json()
+      const json = (await res.json()) as ModelsResponse
       expect(json.provider).toBe('gitee')
       expect(json.models).toBeInstanceOf(Array)
     })
@@ -68,7 +119,7 @@ describe('API Routes', () => {
       const res = await app.request('/api/providers/invalid-provider/models')
       expect(res.status).toBe(400)
 
-      const json = await res.json()
+      const json = (await res.json()) as ErrorResponse
       expect(json.error).toContain('Invalid provider')
     })
   })
@@ -78,7 +129,7 @@ describe('API Routes', () => {
       const res = await app.request('/api/models')
       expect(res.status).toBe(200)
 
-      const json = await res.json()
+      const json = (await res.json()) as ModelsResponse
       expect(json.models).toBeInstanceOf(Array)
       expect(json.models.length).toBeGreaterThan(0)
 
@@ -100,7 +151,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_PARAMS)
       })
 
@@ -115,7 +166,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_PROMPT)
       })
 
@@ -133,7 +184,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_PROMPT)
       })
 
@@ -153,7 +204,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_DIMENSIONS)
       })
 
@@ -173,7 +224,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_DIMENSIONS)
       })
 
@@ -192,7 +243,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_PARAMS)
       })
 
@@ -207,7 +258,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(400)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.INVALID_PROVIDER)
       })
     })
@@ -224,7 +275,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(401)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.code).toBe(ApiErrorCode.AUTH_REQUIRED)
       })
 
@@ -277,7 +328,7 @@ describe('API Routes', () => {
 
         expect(res.status).toBe(200)
 
-        const json = await res.json()
+        const json = (await res.json()) as GenerateResponse
         expect(json.imageDetails).toBeDefined()
         expect(json.imageDetails.url).toBe('https://gitee.ai/generated.png')
         expect(json.imageDetails.provider).toBe('Gitee AI')
@@ -308,7 +359,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(200)
-        const json = await res.json()
+        const json = (await res.json()) as GenerateResponse
 
         // Default dimensions: 1024x1024
         expect(json.imageDetails.dimensions).toContain('1024')
@@ -361,7 +412,7 @@ describe('API Routes', () => {
         })
 
         expect(res.status).toBe(502)
-        const json = await res.json()
+        const json = (await res.json()) as ErrorResponse
         expect(json.error).toBeDefined()
         expect(json.code).toBe(ApiErrorCode.PROVIDER_ERROR)
       })
@@ -387,7 +438,7 @@ describe('API Routes', () => {
       })
 
       expect(res.status).toBe(200)
-      const json = await res.json()
+      const json = (await res.json()) as GenerateResponse
       expect(json.imageDetails.url).toBe('https://hf.space/img.png')
       expect(json.imageDetails.provider).toBe('HuggingFace')
     })
@@ -400,7 +451,7 @@ describe('API Routes', () => {
       })
 
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = (await res.json()) as ErrorResponse
       expect(json.code).toBe(ApiErrorCode.INVALID_PROMPT)
     })
   })
@@ -424,7 +475,7 @@ describe('API Routes', () => {
       })
 
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = (await res.json()) as ErrorResponse
       expect(json.error).toContain('not allowed')
     })
 
@@ -447,7 +498,7 @@ describe('API Routes', () => {
       const res = await app.request('/api/unknown-route')
       expect(res.status).toBe(404)
 
-      const json = await res.json()
+      const json = (await res.json()) as ErrorResponse
       expect(json.error).toBe('Not found')
       expect(json.code).toBe('NOT_FOUND')
     })

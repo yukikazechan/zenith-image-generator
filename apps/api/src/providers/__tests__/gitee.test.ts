@@ -6,6 +6,16 @@
 import { ApiErrorCode } from '@z-image/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GiteeProvider } from '../gitee'
+import type { ProviderGenerateRequest } from '../types'
+
+// Default request with all required fields
+const defaultRequest: ProviderGenerateRequest = {
+  prompt: 'a cat',
+  model: 'z-image-turbo',
+  width: 1024,
+  height: 1024,
+  authToken: 'test-key',
+}
 
 describe('GiteeProvider', () => {
   const provider = new GiteeProvider()
@@ -31,14 +41,14 @@ describe('GiteeProvider', () => {
   describe('generate - auth validation', () => {
     it('should throw AUTH_REQUIRED when no token provided', async () => {
       await expect(
-        provider.generate({ prompt: 'a cat', model: 'z-image-turbo' })
+        provider.generate({ ...defaultRequest, authToken: undefined })
       ).rejects.toMatchObject({
         code: ApiErrorCode.AUTH_REQUIRED,
       })
     })
 
     it('should throw AUTH_REQUIRED with empty token', async () => {
-      await expect(provider.generate({ prompt: 'a cat', authToken: '' })).rejects.toMatchObject({
+      await expect(provider.generate({ ...defaultRequest, authToken: '' })).rejects.toMatchObject({
         code: ApiErrorCode.AUTH_REQUIRED,
       })
     })
@@ -94,9 +104,8 @@ describe('GiteeProvider', () => {
       } as Response)
 
       const result = await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         seed: 12345,
-        authToken: 'key',
       })
 
       expect(result.url).toBe('https://example.com/generated.png')
@@ -109,10 +118,7 @@ describe('GiteeProvider', () => {
         json: async () => ({ data: [{ url: 'https://example.com/img.png' }] }),
       } as Response)
 
-      const result = await provider.generate({
-        prompt: 'a cat',
-        authToken: 'key',
-      })
+      const result = await provider.generate(defaultRequest)
 
       expect(result.seed).toBeGreaterThan(0)
       expect(result.seed).toBeLessThanOrEqual(2147483647)
@@ -126,9 +132,8 @@ describe('GiteeProvider', () => {
       } as Response)
 
       await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         negativePrompt: 'blurry, low quality',
-        authToken: 'key',
       })
 
       const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string)
@@ -143,9 +148,8 @@ describe('GiteeProvider', () => {
       } as Response)
 
       await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         guidanceScale: 7.5,
-        authToken: 'key',
       })
 
       const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string)
@@ -160,7 +164,7 @@ describe('GiteeProvider', () => {
       } as Response)
 
       await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         authToken: '  my-key-with-spaces  ',
       })
 
@@ -178,7 +182,7 @@ describe('GiteeProvider', () => {
       } as Response)
 
       await expect(
-        provider.generate({ prompt: 'a cat', authToken: 'bad-key' })
+        provider.generate({ ...defaultRequest, authToken: 'bad-key' })
       ).rejects.toMatchObject({
         code: ApiErrorCode.AUTH_INVALID,
       })
@@ -191,7 +195,7 @@ describe('GiteeProvider', () => {
         json: async () => ({ error: { message: 'Rate limit exceeded' } }),
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.RATE_LIMITED,
       })
     })
@@ -203,7 +207,7 @@ describe('GiteeProvider', () => {
         json: async () => ({ error: { message: 'Quota exceeded' } }),
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.QUOTA_EXCEEDED,
       })
     })
@@ -218,7 +222,7 @@ describe('GiteeProvider', () => {
       } as Response)
 
       await expect(
-        provider.generate({ prompt: 'a cat', authToken: 'expired-key' })
+        provider.generate({ ...defaultRequest, authToken: 'expired-key' })
       ).rejects.toMatchObject({
         code: ApiErrorCode.AUTH_INVALID, // Expired tokens return AUTH_INVALID
       })
@@ -231,7 +235,7 @@ describe('GiteeProvider', () => {
         json: async () => ({ error: { message: 'Internal server error' } }),
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -243,9 +247,9 @@ describe('GiteeProvider', () => {
         json: async () => {
           throw new Error('Invalid JSON')
         },
-      } as Response)
+      } as unknown as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -256,7 +260,7 @@ describe('GiteeProvider', () => {
         json: async () => ({ data: [] }),
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.GENERATION_FAILED,
       })
     })
@@ -267,7 +271,7 @@ describe('GiteeProvider', () => {
         json: async () => ({}),
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat', authToken: 'key' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.GENERATION_FAILED,
       })
     })

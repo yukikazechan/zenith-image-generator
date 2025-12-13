@@ -6,6 +6,15 @@
 import { ApiErrorCode } from '@z-image/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HuggingFaceProvider } from '../huggingface'
+import type { ProviderGenerateRequest } from '../types'
+
+// Default request with all required fields
+const defaultRequest: ProviderGenerateRequest = {
+  prompt: 'a cat',
+  model: 'z-image-turbo',
+  width: 1024,
+  height: 1024,
+}
 
 describe('HuggingFaceProvider', () => {
   const provider = new HuggingFaceProvider()
@@ -95,7 +104,7 @@ describe('HuggingFaceProvider', () => {
       mockGradioSuccess('https://hf.space/img.png')
 
       const mockFetch = vi.mocked(fetch)
-      await provider.generate({ prompt: 'a cat' })
+      await provider.generate(defaultRequest)
 
       // Verify it called the default space URL
       expect(mockFetch.mock.calls[0][0]).toContain('mrfakename-z-image-turbo.hf.space')
@@ -105,7 +114,7 @@ describe('HuggingFaceProvider', () => {
       mockGradioSuccess('https://hf.space/img.png')
 
       await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         authToken: 'hf_test_token',
       })
 
@@ -117,14 +126,14 @@ describe('HuggingFaceProvider', () => {
     it('should work without auth token (public spaces)', async () => {
       mockGradioSuccess('https://hf.space/img.png')
 
-      const result = await provider.generate({ prompt: 'a cat' })
+      const result = await provider.generate(defaultRequest)
       expect(result.url).toBe('https://hf.space/img.png')
     })
 
     it('should generate random seed if not provided', async () => {
       mockGradioSuccess('https://hf.space/img.png')
 
-      const result = await provider.generate({ prompt: 'a cat' })
+      const result = await provider.generate(defaultRequest)
 
       expect(result.seed).toBeGreaterThan(0)
       expect(result.seed).toBeLessThanOrEqual(2147483647)
@@ -136,7 +145,7 @@ describe('HuggingFaceProvider', () => {
       mockGradioSuccess('https://hf.space/img.png')
 
       await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         model: 'z-image-turbo',
       })
 
@@ -161,7 +170,7 @@ describe('HuggingFaceProvider', () => {
       } as Response)
 
       const result = await provider.generate({
-        prompt: 'a cat',
+        ...defaultRequest,
         model: 'qwen-image-fast',
       })
 
@@ -173,7 +182,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle queue request failure', async () => {
       mockGradioQueueError(500, 'Internal server error')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -181,7 +190,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle 429 rate limit error', async () => {
       mockGradioQueueError(429, 'Too many requests')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.RATE_LIMITED,
       })
     })
@@ -189,7 +198,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle 401 unauthorized error', async () => {
       mockGradioQueueError(401, 'Unauthorized')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.AUTH_INVALID,
       })
     })
@@ -197,7 +206,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle 503 service unavailable', async () => {
       mockGradioQueueError(503, 'Service unavailable')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -205,7 +214,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle SSE error event', async () => {
       mockGradioSSEError('Generation failed due to NSFW content')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -216,7 +225,7 @@ describe('HuggingFaceProvider', () => {
       // "Quota exceeded" with 429 returns RATE_LIMITED. Use different status for QUOTA_EXCEEDED.
       mockGradioQueueError(402, 'Quota exceeded')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.QUOTA_EXCEEDED,
       })
     })
@@ -224,7 +233,7 @@ describe('HuggingFaceProvider', () => {
     it('should handle timeout error message', async () => {
       mockGradioQueueError(504, 'Request timed out')
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.TIMEOUT,
       })
     })
@@ -235,7 +244,7 @@ describe('HuggingFaceProvider', () => {
         json: async () => ({}), // No event_id
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
@@ -254,7 +263,7 @@ describe('HuggingFaceProvider', () => {
         text: async () => 'event: complete\ndata: [{}]\n\n',
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.GENERATION_FAILED,
       })
     })
@@ -273,7 +282,7 @@ describe('HuggingFaceProvider', () => {
         text: async () => 'event: heartbeat\ndata: {}\n\n',
       } as Response)
 
-      await expect(provider.generate({ prompt: 'a cat' })).rejects.toMatchObject({
+      await expect(provider.generate(defaultRequest)).rejects.toMatchObject({
         code: ApiErrorCode.PROVIDER_ERROR,
       })
     })
