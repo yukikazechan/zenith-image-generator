@@ -4,6 +4,7 @@
 
 import type { VideoTaskResponse } from '@z-image/shared'
 import { Errors, VIDEO_NEGATIVE_PROMPT } from '@z-image/shared'
+import { MAX_INT32 } from '../constants'
 import type { ImageProvider, ProviderGenerateRequest, ProviderGenerateResult } from './types'
 
 const GITEE_API_URL = 'https://ai.gitee.com/v1/images/generations'
@@ -70,7 +71,7 @@ export class GiteeProvider implements ImageProvider {
       throw Errors.authRequired('Gitee AI')
     }
 
-    const seed = request.seed ?? Math.floor(Math.random() * 2147483647)
+    const seed = request.seed ?? Math.floor(Math.random() * MAX_INT32)
 
     const requestBody: Record<string, unknown> = {
       prompt: request.prompt,

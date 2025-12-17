@@ -87,6 +87,7 @@ export const LLM_PROVIDER_OPTIONS: { value: LLMProviderType; label: string; need
     { value: 'huggingface-llm', label: 'HuggingFace', needsAuth: false },
     { value: 'gitee-llm', label: 'Gitee AI', needsAuth: true },
     { value: 'modelscope-llm', label: 'ModelScope', needsAuth: true },
+    { value: 'custom', label: 'Custom (OpenAI Compatible)', needsAuth: true },
   ]
 
 /** Get models for LLM provider */
@@ -99,24 +100,53 @@ export function getDefaultLLMModel(provider: LLMProviderType): string {
   return LLM_PROVIDER_CONFIGS[provider]?.defaultModel || 'openai'
 }
 
+/** Custom LLM provider configuration */
+export interface CustomLLMConfig {
+  /** API base URL (e.g., https://api.openai.com/v1) */
+  baseUrl: string
+  /** API key */
+  apiKey: string
+  /** Model name */
+  model: string
+}
+
 /** LLM Settings interface */
 export interface LLMSettings {
   /** LLM provider for optimization */
   llmProvider: LLMProviderType
   /** LLM model for optimization */
   llmModel: string
+  /** LLM provider for translation */
+  translateProvider: LLMProviderType
+  /** LLM model for translation */
+  translateModel: string
   /** Auto-translate enabled (Chinese to English) */
   autoTranslate: boolean
   /** Custom system prompt for optimization */
   customSystemPrompt: string
+  /** Custom provider config for optimization */
+  customOptimizeConfig: CustomLLMConfig
+  /** Custom provider config for translation */
+  customTranslateConfig: CustomLLMConfig
+}
+
+/** Default custom LLM config */
+export const DEFAULT_CUSTOM_LLM_CONFIG: CustomLLMConfig = {
+  baseUrl: '',
+  apiKey: '',
+  model: '',
 }
 
 /** Default LLM settings */
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   llmProvider: 'pollinations',
   llmModel: 'openai-fast',
+  translateProvider: 'pollinations',
+  translateModel: 'openai-fast',
   autoTranslate: true,
   customSystemPrompt: '',
+  customOptimizeConfig: { ...DEFAULT_CUSTOM_LLM_CONFIG },
+  customTranslateConfig: { ...DEFAULT_CUSTOM_LLM_CONFIG },
 }
 
 /** LLM settings storage key */
@@ -132,8 +162,20 @@ export function loadLLMSettings(): LLMSettings {
       return {
         llmProvider: parsed.llmProvider ?? DEFAULT_LLM_SETTINGS.llmProvider,
         llmModel: parsed.llmModel ?? DEFAULT_LLM_SETTINGS.llmModel,
+        translateProvider: parsed.translateProvider ?? DEFAULT_LLM_SETTINGS.translateProvider,
+        translateModel: parsed.translateModel ?? DEFAULT_LLM_SETTINGS.translateModel,
         autoTranslate: parsed.autoTranslate ?? DEFAULT_LLM_SETTINGS.autoTranslate,
         customSystemPrompt: parsed.customSystemPrompt ?? DEFAULT_LLM_SETTINGS.customSystemPrompt,
+        customOptimizeConfig: {
+          baseUrl: parsed.customOptimizeConfig?.baseUrl ?? DEFAULT_CUSTOM_LLM_CONFIG.baseUrl,
+          apiKey: parsed.customOptimizeConfig?.apiKey ?? DEFAULT_CUSTOM_LLM_CONFIG.apiKey,
+          model: parsed.customOptimizeConfig?.model ?? DEFAULT_CUSTOM_LLM_CONFIG.model,
+        },
+        customTranslateConfig: {
+          baseUrl: parsed.customTranslateConfig?.baseUrl ?? DEFAULT_CUSTOM_LLM_CONFIG.baseUrl,
+          apiKey: parsed.customTranslateConfig?.apiKey ?? DEFAULT_CUSTOM_LLM_CONFIG.apiKey,
+          model: parsed.customTranslateConfig?.model ?? DEFAULT_CUSTOM_LLM_CONFIG.model,
+        },
       }
     }
   } catch {

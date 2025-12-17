@@ -51,6 +51,9 @@ jobs:
       - name: Build web
         run: pnpm build:web
 
+      - name: Install Wrangler
+        run: pnpm add -D wrangler@4 -w
+
       - name: Deploy Preview to Cloudflare Pages
         id: deploy
         uses: cloudflare/wrangler-action@v3
@@ -59,7 +62,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy apps/web/dist --project-name=zenith-image-generator --branch=${{ github.head_ref }}
           packageManager: pnpm
-          wranglerVersion: "4"
 
       - name: Comment Preview URL
         uses: actions/github-script@v8

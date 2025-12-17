@@ -3,6 +3,7 @@
  */
 
 import type { LLMProviderType } from '@z-image/shared'
+import { customLLMProvider } from './custom'
 import { deepseekProvider } from './deepseek'
 import { giteeLLMProvider } from './gitee-llm'
 import { huggingfaceLLMProvider } from './huggingface-llm'
@@ -17,6 +18,7 @@ const llmProviders: Record<string, LLMProvider> = {
   'gitee-llm': giteeLLMProvider,
   'modelscope-llm': modelscopeLLMProvider,
   deepseek: deepseekProvider,
+  custom: customLLMProvider,
 }
 
 /** Get LLM provider by ID */

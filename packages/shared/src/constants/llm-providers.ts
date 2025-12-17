@@ -91,6 +91,14 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, LLMProviderConfig> = 
       },
     ],
   },
+  custom: {
+    id: 'custom',
+    name: 'Custom (OpenAI Compatible)',
+    url: '', // User-provided via customConfig
+    defaultModel: '', // User-provided via customConfig
+    needsAuth: true,
+    models: [], // User provides model name directly
+  },
 }
 
 /** Get LLM provider configuration by ID */

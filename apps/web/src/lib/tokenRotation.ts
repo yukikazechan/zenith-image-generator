@@ -65,14 +65,22 @@ function saveTokenStatusStore(store: TokenStatusStore): void {
 }
 
 /**
- * Parse comma-separated tokens into array
+ * Basic token format validation
+ * Tokens should be alphanumeric with common special chars, min 8 chars
+ */
+function isValidTokenFormat(token: string): boolean {
+  return token.length >= 8 && /^[a-zA-Z0-9_\-:.]+$/.test(token)
+}
+
+/**
+ * Parse comma-separated tokens into array with basic validation
  */
 export function parseTokens(rawInput: string | null | undefined): string[] {
   if (!rawInput) return []
   return rawInput
     .split(',')
     .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+    .filter((t) => t.length > 0 && isValidTokenFormat(t))
 }
 
 /**

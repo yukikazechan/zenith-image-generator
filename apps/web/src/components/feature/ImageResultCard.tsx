@@ -15,6 +15,7 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImageComparison } from '@/components/ui/ImageComparison'
@@ -52,6 +53,7 @@ export function ImageResultCard({
   handleDownload,
   handleDelete,
 }: ImageResultCardProps) {
+  const { t } = useTranslation()
   // Comparison mode state
   const [isComparing, setIsComparing] = useState(false)
   const [tempUpscaledUrl, setTempUpscaledUrl] = useState<string | null>(null)
@@ -98,12 +100,12 @@ export function ImageResultCard({
       if (result.success && result.data.url) {
         setTempUpscaledUrl(result.data.url)
         setIsComparing(true)
-        toast.success('4x upscale complete! Drag slider to compare.')
+        toast.success(t('result.upscaleCompareHint'))
       } else if (!result.success) {
-        toast.error(result.error || 'Upscale failed')
+        toast.error(result.error || t('status.upscaleFailedGeneric'))
       }
     } catch (_err) {
-      toast.error('Upscale failed')
+      toast.error(t('status.upscaleFailedGeneric'))
     } finally {
       setIsUpscalingLocal(false)
     }
@@ -117,9 +119,9 @@ export function ImageResultCard({
       setIsComparing(false)
       // Mark as upscaled locally (don't call parent's handleUpscale to avoid double API call)
       setIsUpscaledLocal(true)
-      toast.success('Upscaled image applied!')
+      toast.success(t('result.upscaleApplied'))
     }
-  }, [tempUpscaledUrl])
+  }, [tempUpscaledUrl, t])
 
   // Cancel comparison
   const handleCancelComparison = useCallback(() => {
@@ -132,26 +134,26 @@ export function ImageResultCard({
     if (!currentImageUrl || !imageDetails) return
 
     if (!giteeToken) {
-      toast.error('Please configure Gitee AI token first')
+      toast.error(t('result.configureGiteeToken'))
       return
     }
 
     const width = Number.parseInt(imageDetails.dimensions.split('x')[0], 10) || 1024
     const height = Number.parseInt(imageDetails.dimensions.split('x')[1], 10) || 1024
 
-    toast.info('Starting video generation...')
+    toast.info(t('result.startingVideoGeneration'))
     await generateVideo(currentImageUrl, imageDetails.prompt, width, height, 'gitee', giteeToken)
-  }, [currentImageUrl, imageDetails, generateVideo, giteeToken])
+  }, [currentImageUrl, imageDetails, generateVideo, giteeToken, t])
 
   // Show video when generation succeeds
   useEffect(() => {
     if (videoState.status === 'success') {
       setShowVideo(true)
-      toast.success('Video generated successfully!')
+      toast.success(t('result.videoGeneratedSuccess'))
     } else if (videoState.status === 'failed') {
-      toast.error(videoState.error || 'Video generation failed')
+      toast.error(videoState.error || t('result.videoGenerationFailed'))
     }
-  }, [videoState.status, videoState.error])
+  }, [videoState.status, videoState.error, t])
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {
@@ -259,7 +261,7 @@ export function ImageResultCard({
     <>
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-zinc-500 text-sm font-normal">Result</CardTitle>
+          <CardTitle className="text-zinc-500 text-sm font-normal">{t('result.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="relative rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800 group">
@@ -281,7 +283,7 @@ export function ImageResultCard({
                     alt="Generated"
                     className={`w-full transition-all duration-300 cursor-pointer ${isBlurred ? 'blur-xl' : ''}`}
                     onDoubleClick={handleDoubleClick}
-                    title="Double-click to view fullscreen"
+                    title={t('result.doubleClickFullscreen')}
                   />
                 )}
 
@@ -292,7 +294,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={() => setShowInfo(!showInfo)}
-                      title="Details"
+                      title={t('result.details')}
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         showInfo
                           ? 'bg-orange-600 text-white'
@@ -306,7 +308,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={() => setIsBlurred(!isBlurred)}
-                      title="Toggle Blur"
+                      title={t('result.toggleBlur')}
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         isBlurred
                           ? 'text-orange-400 bg-white/10'
@@ -329,12 +331,12 @@ export function ImageResultCard({
                       }
                       title={
                         videoState.status === 'generating' || videoState.status === 'polling'
-                          ? 'Generating video...'
+                          ? t('result.generatingVideo')
                           : videoState.status === 'success'
                             ? showVideo
-                              ? 'Show image'
-                              : 'Show video'
-                            : 'Generate video'
+                              ? t('result.showImage')
+                              : t('result.showVideo')
+                            : t('result.generateVideo')
                       }
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         videoState.status === 'success'
@@ -353,7 +355,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={handleDownload}
-                      title="Download"
+                      title={t('common.download')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl transition-all text-white/70 hover:text-white hover:bg-white/10"
                     >
                       <Download className="w-5 h-5" />
@@ -362,7 +364,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={handleDelete}
-                      title="Delete"
+                      title={t('common.delete')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl transition-all text-white/70 hover:text-red-400 hover:bg-red-500/10"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -374,26 +376,31 @@ export function ImageResultCard({
                 {showInfo && (
                   <div className="absolute top-3 left-3 right-3 p-3 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-xs text-zinc-300 space-y-1">
                     <div>
-                      <span className="text-zinc-500">Provider:</span> {imageDetails.provider}
+                      <span className="text-zinc-500">{t('result.provider')}</span>{' '}
+                      {imageDetails.provider}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Model:</span> {imageDetails.model}
+                      <span className="text-zinc-500">{t('result.model')}</span>{' '}
+                      {imageDetails.model}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Dimensions:</span> {imageDetails.dimensions}
+                      <span className="text-zinc-500">{t('result.dimensions')}</span>{' '}
+                      {imageDetails.dimensions}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Duration:</span> {imageDetails.duration}
+                      <span className="text-zinc-500">{t('result.duration')}</span>{' '}
+                      {imageDetails.duration}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Seed:</span> {imageDetails.seed}
+                      <span className="text-zinc-500">{t('result.seed')}</span> {imageDetails.seed}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Steps:</span> {imageDetails.steps}
+                      <span className="text-zinc-500">{t('result.steps')}</span>{' '}
+                      {imageDetails.steps}
                     </div>
                     <div>
-                      <span className="text-zinc-500">Upscaled:</span>{' '}
-                      {isImageUpscaled ? 'Yes (4x)' : 'No'}
+                      <span className="text-zinc-500">{t('result.upscaled')}</span>{' '}
+                      {isImageUpscaled ? t('result.upscaledYes') : t('common.no')}
                     </div>
                   </div>
                 )}
@@ -404,12 +411,12 @@ export function ImageResultCard({
                   <>
                     <div className="w-12 h-12 border-4 border-zinc-800 border-t-orange-500 rounded-full animate-spin mb-3" />
                     <span className="text-zinc-400 font-mono text-lg">{elapsed.toFixed(1)}s</span>
-                    <span className="text-zinc-600 text-sm mt-1">Creating your image...</span>
+                    <span className="text-zinc-600 text-sm mt-1">{t('result.creating')}</span>
                   </>
                 ) : (
                   <>
                     <ImageIcon className="w-12 h-12 text-zinc-700 mb-2" />
-                    <span className="text-zinc-600 text-sm">Your image will appear here</span>
+                    <span className="text-zinc-600 text-sm">{t('result.placeholder')}</span>
                   </>
                 )}
               </div>
@@ -441,10 +448,10 @@ export function ImageResultCard({
 
             {/* Keyboard shortcuts hint */}
             <div className="absolute top-4 left-4 text-xs text-white/40 space-y-1">
-              <div>Esc - Close</div>
-              <div>+/- - Zoom</div>
-              <div>0 - Reset</div>
-              <div>Scroll - Zoom</div>
+              <div>{t('result.shortcutClose')}</div>
+              <div>{t('result.shortcutZoom')}</div>
+              <div>{t('result.shortcutReset')}</div>
+              <div>{t('result.shortcutScroll')}</div>
             </div>
 
             {/* Image container with wheel zoom and drag */}
@@ -461,8 +468,8 @@ export function ImageResultCard({
                 <ImageComparison
                   beforeImage={currentImageUrl}
                   afterImage={tempUpscaledUrl}
-                  beforeLabel="Original"
-                  afterLabel="4x Upscaled"
+                  beforeLabel={t('result.original')}
+                  afterLabel={t('result.upscaled4x')}
                   className="max-w-full max-h-full"
                 />
               </motion.div>
@@ -508,18 +515,20 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={handleCancelComparison}
-                      title="Cancel (Esc)"
+                      title={t('result.cancelEsc')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all"
                     >
                       <X className="w-5 h-5" />
                     </button>
                     <div className="w-px h-5 bg-white/10" />
-                    <span className="px-3 text-xs text-white/60">Drag slider to compare</span>
+                    <span className="px-3 text-xs text-white/60">
+                      {t('result.dragSliderCompare')}
+                    </span>
                     <div className="w-px h-5 bg-white/10" />
                     <button
                       type="button"
                       onClick={handleConfirmUpscale}
-                      title="Apply upscaled image"
+                      title={t('result.applyUpscaled')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl text-green-400 hover:text-green-300 hover:bg-green-500/10 transition-all"
                     >
                       <Check className="w-5 h-5" />
@@ -532,7 +541,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={() => setShowInfo(!showInfo)}
-                      title="Details"
+                      title={t('result.details')}
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         showInfo
                           ? 'bg-orange-600 text-white'
@@ -548,7 +557,7 @@ export function ImageResultCard({
                       type="button"
                       onClick={handleZoomOut}
                       disabled={scale <= 1}
-                      title="Zoom out (-)"
+                      title={t('result.zoomOut')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ZoomOut className="w-5 h-5" />
@@ -556,7 +565,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={handleResetZoom}
-                      title="Reset zoom (0)"
+                      title={t('result.resetZoom')}
                       className="flex items-center justify-center px-2 h-10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all text-xs font-medium min-w-[3rem]"
                     >
                       {Math.round(scale * 100)}%
@@ -565,7 +574,7 @@ export function ImageResultCard({
                       type="button"
                       onClick={handleZoomIn}
                       disabled={scale >= 8}
-                      title="Zoom in (+)"
+                      title={t('result.zoomIn')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ZoomIn className="w-5 h-5" />
@@ -579,10 +588,10 @@ export function ImageResultCard({
                       disabled={isUpscaling || isImageUpscaled}
                       title={
                         isUpscaling
-                          ? 'Upscaling...'
+                          ? t('result.upscaling')
                           : isImageUpscaled
-                            ? 'Already upscaled'
-                            : '4x Upscale'
+                            ? t('result.alreadyUpscaled')
+                            : t('result.upscale4x')
                       }
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         isImageUpscaled
@@ -602,7 +611,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={() => setIsBlurred(!isBlurred)}
-                      title="Toggle Blur"
+                      title={t('result.toggleBlur')}
                       className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                         isBlurred
                           ? 'text-orange-400 bg-white/10'
@@ -617,7 +626,7 @@ export function ImageResultCard({
                     <button
                       type="button"
                       onClick={handleDownload}
-                      title="Download"
+                      title={t('common.download')}
                       className="flex items-center justify-center w-10 h-10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all"
                     >
                       <Download className="w-5 h-5" />
@@ -637,28 +646,28 @@ export function ImageResultCard({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Provider</span>
+                  <span className="text-zinc-500">{t('result.providerLabel')}</span>
                   <span>{imageDetails.provider}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Model</span>
+                  <span className="text-zinc-500">{t('result.modelLabel')}</span>
                   <span>{imageDetails.model}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Size</span>
+                  <span className="text-zinc-500">{t('result.sizeLabel')}</span>
                   <span>{imageDetails.dimensions}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Duration</span>
+                  <span className="text-zinc-500">{t('result.durationLabel')}</span>
                   <span>{imageDetails.duration}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Seed</span>
+                  <span className="text-zinc-500">{t('result.seedLabel')}</span>
                   <span className="font-mono">{imageDetails.seed}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Upscaled</span>
-                  <span>{isImageUpscaled ? 'Yes (4x)' : 'No'}</span>
+                  <span className="text-zinc-500">{t('result.upscaledLabel')}</span>
+                  <span>{isImageUpscaled ? t('result.upscaledYes') : t('common.no')}</span>
                 </div>
               </motion.div>
             )}
@@ -674,7 +683,7 @@ export function ImageResultCard({
               >
                 <div className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-zinc-900/90 border border-zinc-700">
                   <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
-                  <span className="text-white text-sm">Upscaling to 4x...</span>
+                  <span className="text-white text-sm">{t('result.upscalingTo4x')}</span>
                 </div>
               </motion.div>
             )}

@@ -37,19 +37,20 @@ Object.defineProperty(window, 'localStorage', {
 })
 
 describe('parseTokens', () => {
+  // Note: parseTokens validates tokens (min 8 chars, alphanumeric with _-:.)
   it('should parse comma-separated tokens', () => {
-    const result = parseTokens('token1, token2, token3')
-    expect(result).toEqual(['token1', 'token2', 'token3'])
+    const result = parseTokens('hf_token_abc, hf_token_def, hf_token_ghi')
+    expect(result).toEqual(['hf_token_abc', 'hf_token_def', 'hf_token_ghi'])
   })
 
   it('should trim whitespace from tokens', () => {
-    const result = parseTokens('  token1  ,  token2  ,  token3  ')
-    expect(result).toEqual(['token1', 'token2', 'token3'])
+    const result = parseTokens('  hf_token_abc  ,  hf_token_def  ,  hf_token_ghi  ')
+    expect(result).toEqual(['hf_token_abc', 'hf_token_def', 'hf_token_ghi'])
   })
 
   it('should filter empty tokens', () => {
-    const result = parseTokens('token1,,token2,  ,token3')
-    expect(result).toEqual(['token1', 'token2', 'token3'])
+    const result = parseTokens('hf_token_abc,,hf_token_def,  ,hf_token_ghi')
+    expect(result).toEqual(['hf_token_abc', 'hf_token_def', 'hf_token_ghi'])
   })
 
   it('should return empty array for null/undefined input', () => {
@@ -59,14 +60,25 @@ describe('parseTokens', () => {
   })
 
   it('should handle single token', () => {
-    const result = parseTokens('single_token')
-    expect(result).toEqual(['single_token'])
+    const result = parseTokens('single_token_value')
+    expect(result).toEqual(['single_token_value'])
   })
 
   it('should NOT split on Chinese comma', () => {
-    const result = parseTokens('token1，token2，token3')
-    // Chinese commas are NOT recognized as separators
-    expect(result).toEqual(['token1，token2，token3'])
+    const result = parseTokens('hf_token_abc，hf_token_def，hf_token_ghi')
+    // Chinese commas are NOT recognized as separators, but the token contains invalid chars
+    // so it gets filtered out by validation
+    expect(result).toEqual([])
+  })
+
+  it('should filter out tokens that are too short', () => {
+    const result = parseTokens('short, hf_valid_token_123')
+    expect(result).toEqual(['hf_valid_token_123'])
+  })
+
+  it('should filter out tokens with invalid characters', () => {
+    const result = parseTokens('valid_token_123, invalid@token!, another_valid_1')
+    expect(result).toEqual(['valid_token_123', 'another_valid_1'])
   })
 })
 

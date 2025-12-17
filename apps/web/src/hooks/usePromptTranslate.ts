@@ -64,7 +64,7 @@ export function usePromptTranslate(
       setError(null)
 
       try {
-        const result = await translatePrompt(prompt)
+        const result = await translatePrompt({ prompt })
 
         if (!result.success) {
           setError(result.error)

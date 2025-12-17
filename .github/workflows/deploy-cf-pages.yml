@@ -41,6 +41,9 @@ jobs:
       - name: Build web
         run: pnpm build:web
 
+      - name: Install Wrangler
+        run: pnpm add -D wrangler@4 -w
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
@@ -48,4 +51,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy apps/web/dist --project-name=zenith-image-generator
           packageManager: pnpm
-          wranglerVersion: "4"

@@ -8,11 +8,13 @@
 import type {
   ApiErrorCode,
   ApiErrorResponse,
+  CustomLLMConfig,
   GenerateRequest,
   GenerateSuccessResponse,
   LLMProviderType,
   OptimizeRequest,
   OptimizeResponse,
+  TranslateRequest,
   TranslateResponse,
   UpscaleRequest,
   UpscaleResponse,
@@ -21,12 +23,10 @@ import type {
 } from '@z-image/shared'
 import { LLM_PROVIDER_CONFIGS } from '@z-image/shared'
 import { PROVIDER_CONFIGS, type ProviderType } from './constants'
-import { getNextAvailableToken, isQuotaError, markTokenExhausted } from './tokenRotation'
+import type { TokenProvider } from './crypto'
+import { runWithTokenRotation } from './tokenRotation'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
-
-// Maximum retry attempts for token rotation
-const MAX_RETRY_ATTEMPTS = 10
 
 /** API error with code */
 export interface ApiErrorInfo {
@@ -51,6 +51,34 @@ function parseErrorResponse(data: unknown): ApiErrorInfo {
     }
   }
   return { message: 'Unknown error' }
+}
+
+/** Extended error with status and code */
+interface ApiError extends Error {
+  status?: number
+  code?: string
+}
+
+/** Generic fetch wrapper with error handling */
+async function apiRequest<T>(url: string, options: RequestInit): Promise<T> {
+  const response = await fetch(url, options)
+
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error('Invalid response from server')
+  }
+
+  if (!response.ok) {
+    const errorInfo = parseErrorResponse(data)
+    const error = new Error(getErrorMessage(errorInfo)) as ApiError
+    error.status = response.status
+    error.code = errorInfo.code
+    throw error
+  }
+
+  return data as T
 }
 
 /** Get user-friendly error message based on error code */
@@ -106,13 +134,11 @@ export interface AuthToken {
 async function generateImageSingle(
   options: GenerateOptions,
   token: string | null
-): Promise<ApiResponse<GenerateSuccessResponse>> {
+): Promise<GenerateSuccessResponse> {
   const { provider, prompt, negativePrompt, width, height, steps, seed, model } = options
 
   const providerConfig = PROVIDER_CONFIGS[provider]
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
 
   if (token && providerConfig) {
     headers[providerConfig.authHeader] = token
@@ -129,27 +155,11 @@ async function generateImageSingle(
     seed,
   }
 
-  const response = await fetch(`${API_URL}/api/generate`, {
+  return apiRequest<GenerateSuccessResponse>(`${API_URL}/api/generate`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    const errorInfo = parseErrorResponse(data)
-    // Throw with status for quota detection
-    const error = new Error(getErrorMessage(errorInfo)) as Error & {
-      status?: number
-      code?: string
-    }
-    error.status = response.status
-    error.code = errorInfo.code
-    throw error
-  }
-
-  return { success: true, data: data as GenerateSuccessResponse }
 }
 
 /**
@@ -174,61 +184,16 @@ export async function generateImage(
     }
   }
 
-  // No tokens but auth not required - try anonymous
-  if (allTokens.length === 0) {
-    try {
-      return await generateImageSingle(options, null)
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : 'Network error',
-      }
-    }
-  }
+  const result = await runWithTokenRotation(
+    provider as TokenProvider,
+    allTokens,
+    (t) => generateImageSingle(options, t),
+    { allowAnonymous: !providerConfig.requiresAuth }
+  )
 
-  // Token rotation loop
-  let attempts = 0
-  while (attempts < MAX_RETRY_ATTEMPTS) {
-    const nextToken = getNextAvailableToken(provider, allTokens)
-
-    // All tokens exhausted
-    if (!nextToken) {
-      // Try anonymous if provider allows it
-      if (!providerConfig.requiresAuth) {
-        try {
-          return await generateImageSingle(options, null)
-        } catch (err) {
-          return {
-            success: false,
-            error: err instanceof Error ? err.message : 'Network error',
-          }
-        }
-      }
-      return {
-        success: false,
-        error: 'All API tokens exhausted. Quota will reset tomorrow.',
-      }
-    }
-
-    try {
-      return await generateImageSingle(options, nextToken)
-    } catch (err) {
-      if (isQuotaError(err)) {
-        markTokenExhausted(provider, nextToken)
-        attempts++
-        continue
-      }
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : 'Network error',
-      }
-    }
-  }
-
-  return {
-    success: false,
-    error: 'Maximum retry attempts reached',
-  }
+  return result.success
+    ? { success: true, data: result.data }
+    : { success: false, error: result.error }
 }
 
 /**
@@ -238,37 +203,15 @@ async function upscaleImageSingle(
   url: string,
   scale: number,
   token: string | null
-): Promise<ApiResponse<UpscaleResponse>> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+): Promise<UpscaleResponse> {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  if (token) headers['X-HF-Token'] = token
 
-  if (token) {
-    headers['X-HF-Token'] = token
-  }
-
-  const body: UpscaleRequest = { url, scale }
-
-  const response = await fetch(`${API_URL}/api/upscale`, {
+  return apiRequest<UpscaleResponse>(`${API_URL}/api/upscale`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify({ url, scale } as UpscaleRequest),
   })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    const errorInfo = parseErrorResponse(data)
-    const error = new Error(getErrorMessage(errorInfo)) as Error & {
-      status?: number
-      code?: string
-    }
-    error.status = response.status
-    error.code = errorInfo.code
-    throw error
-  }
-
-  return { success: true, data: data as UpscaleResponse }
 }
 
 /**
@@ -279,57 +222,18 @@ export async function upscaleImage(
   scale = 4,
   hfTokens?: string | string[]
 ): Promise<ApiResponse<UpscaleResponse>> {
-  // Build token list
   const allTokens = Array.isArray(hfTokens) ? hfTokens : hfTokens ? [hfTokens] : []
 
-  // No tokens - try anonymous (HuggingFace allows anonymous)
-  if (allTokens.length === 0) {
-    try {
-      return await upscaleImageSingle(url, scale, null)
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : 'Network error',
-      }
-    }
-  }
+  const result = await runWithTokenRotation(
+    'huggingface',
+    allTokens,
+    (t) => upscaleImageSingle(url, scale, t),
+    { allowAnonymous: true }
+  )
 
-  // Token rotation loop
-  let attempts = 0
-  while (attempts < MAX_RETRY_ATTEMPTS) {
-    const nextToken = getNextAvailableToken('huggingface', allTokens)
-
-    // All tokens exhausted - try anonymous
-    if (!nextToken) {
-      try {
-        return await upscaleImageSingle(url, scale, null)
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'Network error',
-        }
-      }
-    }
-
-    try {
-      return await upscaleImageSingle(url, scale, nextToken)
-    } catch (err) {
-      if (isQuotaError(err)) {
-        markTokenExhausted('huggingface', nextToken)
-        attempts++
-        continue
-      }
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : 'Network error',
-      }
-    }
-  }
-
-  return {
-    success: false,
-    error: 'Maximum retry attempts reached',
-  }
+  return result.success
+    ? { success: true, data: result.data }
+    : { success: false, error: result.error }
 }
 
 /** Optimize prompt options */
@@ -344,6 +248,8 @@ export interface OptimizeOptions {
   model?: string
   /** Custom system prompt */
   systemPrompt?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
 }
 
 /** Map LLM provider to token provider for token rotation */
@@ -370,47 +276,33 @@ function getLLMTokenProvider(
 async function optimizePromptSingle(
   options: OptimizeOptions,
   token: string | null
-): Promise<ApiResponse<OptimizeResponse>> {
-  const { prompt, provider = 'pollinations', lang = 'en', model, systemPrompt } = options
+): Promise<OptimizeResponse> {
+  const {
+    prompt,
+    provider = 'pollinations',
+    lang = 'en',
+    model,
+    systemPrompt,
+    customConfig,
+  } = options
 
   const providerConfig = LLM_PROVIDER_CONFIGS[provider]
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
 
-  // Add auth header if provider requires it and token is provided
   if (token && providerConfig?.needsAuth && providerConfig?.authHeader) {
     headers[providerConfig.authHeader] = token
   }
 
-  const body: OptimizeRequest = {
-    prompt,
-    provider,
-    lang,
-    model,
-    systemPrompt,
+  const body: OptimizeRequest = { prompt, provider, lang, model, systemPrompt }
+  if (provider === 'custom' && customConfig) {
+    body.customConfig = customConfig
   }
 
-  const response = await fetch(`${API_URL}/api/optimize`, {
+  return apiRequest<OptimizeResponse>(`${API_URL}/api/optimize`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    const errorInfo = parseErrorResponse(data)
-    const error = new Error(getErrorMessage(errorInfo)) as Error & {
-      status?: number
-      code?: string
-    }
-    error.status = response.status
-    error.code = errorInfo.code
-    throw error
-  }
-
-  return { success: true, data: data as OptimizeResponse }
 }
 
 /**
@@ -420,21 +312,40 @@ export async function optimizePrompt(
   options: OptimizeOptions,
   tokenOrTokens?: string | string[]
 ): Promise<ApiResponse<OptimizeResponse>> {
-  const { provider = 'pollinations' } = options
+  const { provider = 'pollinations', customConfig } = options
   const providerConfig = LLM_PROVIDER_CONFIGS[provider]
   const tokenProvider = getLLMTokenProvider(provider)
 
-  // Build token list
   const allTokens = Array.isArray(tokenOrTokens)
     ? tokenOrTokens
     : tokenOrTokens
       ? [tokenOrTokens]
       : []
 
+  // Custom provider - uses its own API key from customConfig
+  if (provider === 'custom') {
+    if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
+      return {
+        success: false,
+        error: 'Please configure custom provider URL, API key, and model',
+      }
+    }
+    try {
+      const data = await optimizePromptSingle(options, null)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error',
+      }
+    }
+  }
+
   // Provider doesn't need auth (e.g., pollinations)
   if (!providerConfig?.needsAuth) {
     try {
-      return await optimizePromptSingle(options, null)
+      const data = await optimizePromptSingle(options, null)
+      return { success: true, data }
     } catch (err) {
       return {
         success: false,
@@ -444,34 +355,94 @@ export async function optimizePrompt(
   }
 
   // No tokens and requires auth
-  if (allTokens.length === 0) {
+  if (allTokens.length === 0 || !tokenProvider) {
     return {
       success: false,
       error: `Please configure your ${provider} token first`,
     }
   }
 
-  // Token rotation loop
-  let attempts = 0
-  while (attempts < MAX_RETRY_ATTEMPTS) {
-    const nextToken = tokenProvider ? getNextAvailableToken(tokenProvider, allTokens) : allTokens[0]
+  const result = await runWithTokenRotation(
+    tokenProvider,
+    allTokens,
+    (t) => optimizePromptSingle(options, t),
+    { allowAnonymous: false }
+  )
 
-    // All tokens exhausted
-    if (!nextToken) {
+  return result.success
+    ? { success: true, data: result.data }
+    : { success: false, error: result.error }
+}
+
+/** Translate prompt options */
+export interface TranslateOptions {
+  /** The prompt to translate */
+  prompt: string
+  /** LLM provider (default: pollinations) */
+  provider?: LLMProviderType
+  /** Specific model to use */
+  model?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
+}
+
+/**
+ * Internal: Make a single translate API call with specific token
+ */
+async function translatePromptSingle(
+  options: TranslateOptions,
+  token: string | null
+): Promise<TranslateResponse> {
+  const { prompt, provider = 'pollinations', model, customConfig } = options
+
+  const providerConfig = LLM_PROVIDER_CONFIGS[provider]
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+
+  if (token && providerConfig?.needsAuth && providerConfig?.authHeader) {
+    headers[providerConfig.authHeader] = token
+  }
+
+  const body: TranslateRequest = { prompt, provider, model }
+  if (provider === 'custom' && customConfig) {
+    body.customConfig = customConfig
+  }
+
+  return apiRequest<TranslateResponse>(`${API_URL}/api/translate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Translate a prompt from Chinese to English with token rotation
+ */
+export async function translatePrompt(
+  options: TranslateOptions,
+  tokenOrTokens?: string | string[]
+): Promise<ApiResponse<TranslateResponse>> {
+  const { provider = 'pollinations', customConfig } = options
+  const providerConfig = LLM_PROVIDER_CONFIGS[provider]
+  const tokenProvider = getLLMTokenProvider(provider)
+
+  const allTokens = Array.isArray(tokenOrTokens)
+    ? tokenOrTokens
+    : tokenOrTokens
+      ? [tokenOrTokens]
+      : []
+
+  // Custom provider - uses its own API key from customConfig
+  if (provider === 'custom') {
+    if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
       return {
         success: false,
-        error: 'All API tokens exhausted. Quota will reset tomorrow.',
+        error: 'Please configure custom provider URL, API key, and model',
       }
     }
-
     try {
-      return await optimizePromptSingle(options, nextToken)
+      const data = await translatePromptSingle(options, null)
+      return { success: true, data }
     } catch (err) {
-      if (isQuotaError(err) && tokenProvider) {
-        markTokenExhausted(tokenProvider, nextToken)
-        attempts++
-        continue
-      }
       return {
         success: false,
         error: err instanceof Error ? err.message : 'Network error',
@@ -479,44 +450,64 @@ export async function optimizePrompt(
     }
   }
 
-  return {
-    success: false,
-    error: 'Maximum retry attempts reached',
+  // Provider doesn't need auth (e.g., pollinations)
+  if (!providerConfig?.needsAuth) {
+    try {
+      const data = await translatePromptSingle(options, null)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error',
+      }
+    }
   }
+
+  // No tokens and requires auth
+  if (allTokens.length === 0 || !tokenProvider) {
+    return {
+      success: false,
+      error: `Please configure your ${provider} token first`,
+    }
+  }
+
+  const result = await runWithTokenRotation(
+    tokenProvider,
+    allTokens,
+    (t) => translatePromptSingle(options, t),
+    { allowAnonymous: false }
+  )
+
+  return result.success
+    ? { success: true, data: result.data }
+    : { success: false, error: result.error }
+}
+
+/** Custom model info */
+export interface CustomModelInfo {
+  id: string
+  name: string
+  owned_by?: string
 }
 
 /**
- * Translate a prompt from Chinese to English
- * Uses Pollinations AI with openai-fast model (free, no auth required)
+ * Fetch available models from a custom OpenAI-compatible provider
  */
-export async function translatePrompt(prompt: string): Promise<ApiResponse<TranslateResponse>> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
-
+export async function fetchCustomModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ApiResponse<{ models: CustomModelInfo[] }>> {
   try {
-    const response = await fetch(`${API_URL}/api/translate`, {
+    const data = await apiRequest<{ models: CustomModelInfo[] }>(`${API_URL}/api/custom-models`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ prompt }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl, apiKey }),
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      const errorInfo = parseErrorResponse(data)
-      return {
-        success: false,
-        error: getErrorMessage(errorInfo),
-        errorInfo,
-      }
-    }
-
-    return { success: true, data: data as TranslateResponse }
+    return { success: true, data }
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Network error',
+      error: err instanceof Error ? err.message : 'Failed to fetch models',
     }
   }
 }
@@ -528,29 +519,15 @@ export async function createVideoTask(
   options: VideoGenerateRequest,
   token: string
 ): Promise<ApiResponse<{ taskId: string; status: string }>> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'X-API-Key': token,
-  }
-
   try {
-    const response = await fetch(`${API_URL}/api/video/generate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(options),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      const errorInfo = parseErrorResponse(data)
-      return {
-        success: false,
-        error: getErrorMessage(errorInfo),
-        errorInfo,
+    const data = await apiRequest<{ taskId: string; status: string }>(
+      `${API_URL}/api/video/generate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': token },
+        body: JSON.stringify(options),
       }
-    }
-
+    )
     return { success: true, data }
   } catch (err) {
     return {
@@ -567,27 +544,11 @@ export async function getVideoTaskStatus(
   taskId: string,
   token: string
 ): Promise<ApiResponse<VideoTaskResponse>> {
-  const headers: HeadersInit = {
-    'X-API-Key': token,
-  }
-
   try {
-    const response = await fetch(`${API_URL}/api/video/status/${taskId}`, {
+    const data = await apiRequest<VideoTaskResponse>(`${API_URL}/api/video/status/${taskId}`, {
       method: 'GET',
-      headers,
+      headers: { 'X-API-Key': token },
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      const errorInfo = parseErrorResponse(data)
-      return {
-        success: false,
-        error: getErrorMessage(errorInfo),
-        errorInfo,
-      }
-    }
-
     return { success: true, data }
   } catch (err) {
     return {

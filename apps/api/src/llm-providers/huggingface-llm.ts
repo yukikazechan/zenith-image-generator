@@ -57,7 +57,7 @@ export class HuggingFaceLLMProvider implements LLMProvider {
         inputs: fullPrompt,
         parameters: {
           max_new_tokens: request.maxTokens || 1000,
-          temperature: 0.7,
+          temperature: request.temperature ?? 0.7,
           do_sample: true,
           return_full_text: false,
         },

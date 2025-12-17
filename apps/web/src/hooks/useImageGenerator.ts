@@ -49,8 +49,12 @@ export function useImageGenerator() {
   const [steps, setSteps] = useState(() => loadSettings().steps ?? 9)
   const [loading, setLoading] = useState(false)
   const [imageDetails, setImageDetails] = useState<ImageDetails | null>(() => {
-    const stored = localStorage.getItem(IMAGE_DETAILS_KEY)
-    return stored ? JSON.parse(stored) : null
+    try {
+      const stored = localStorage.getItem(IMAGE_DETAILS_KEY)
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
   })
   const [status, setStatus] = useState('Ready.')
   const [elapsed, setElapsed] = useState(0)
@@ -240,8 +244,10 @@ export function useImageGenerator() {
           const apiUrl = import.meta.env.VITE_API_URL || ''
           const proxyUrl = `${apiUrl}/api/proxy-image?url=${encodeURIComponent(details.url)}`
           const response = await fetch(proxyUrl)
-          const blob = await response.blob()
-          details.url = URL.createObjectURL(blob)
+          if (response.ok) {
+            const blob = await response.blob()
+            details.url = URL.createObjectURL(blob)
+          }
         } catch (e) {
           console.warn('Failed to cache HF image:', e)
         }
@@ -317,22 +323,77 @@ export function useImageGenerator() {
     [updateLLMSettings]
   )
 
+  const setTranslateProvider = useCallback(
+    (provider: LLMProviderType) => {
+      updateLLMSettings({
+        translateProvider: provider,
+        translateModel: getDefaultLLMModel(provider),
+      })
+    },
+    [updateLLMSettings]
+  )
+
+  const setTranslateModel = useCallback(
+    (model: string) => {
+      updateLLMSettings({ translateModel: model })
+    },
+    [updateLLMSettings]
+  )
+
+  const setCustomOptimizeConfig = useCallback(
+    (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => {
+      setLLMSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          customOptimizeConfig: { ...prev.customOptimizeConfig, ...config },
+        }
+        saveLLMSettings(newSettings)
+        return newSettings
+      })
+    },
+    []
+  )
+
+  const setCustomTranslateConfig = useCallback(
+    (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => {
+      setLLMSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          customTranslateConfig: { ...prev.customTranslateConfig, ...config },
+        }
+        saveLLMSettings(newSettings)
+        return newSettings
+      })
+    },
+    []
+  )
+
   // Get tokens for LLM provider (maps llm provider to token provider)
+  const getTokensForLLMProvider = useCallback(
+    async (llmProvider: LLMProviderType): Promise<string[]> => {
+      switch (llmProvider) {
+        case 'gitee-llm':
+          return loadTokensArray('gitee')
+        case 'modelscope-llm':
+          return loadTokensArray('modelscope')
+        case 'huggingface-llm':
+          return loadTokensArray('huggingface')
+        case 'deepseek':
+          return loadTokensArray('deepseek')
+        default:
+          return []
+      }
+    },
+    []
+  )
+
   const getLLMTokens = useCallback(async (): Promise<string[]> => {
-    const { llmProvider } = llmSettings
-    switch (llmProvider) {
-      case 'gitee-llm':
-        return loadTokensArray('gitee')
-      case 'modelscope-llm':
-        return loadTokensArray('modelscope')
-      case 'huggingface-llm':
-        return loadTokensArray('huggingface')
-      case 'deepseek':
-        return loadTokensArray('deepseek')
-      default:
-        return []
-    }
-  }, [llmSettings])
+    return getTokensForLLMProvider(llmSettings.llmProvider)
+  }, [llmSettings.llmProvider, getTokensForLLMProvider])
+
+  const getTranslateTokens = useCallback(async (): Promise<string[]> => {
+    return getTokensForLLMProvider(llmSettings.translateProvider)
+  }, [llmSettings.translateProvider, getTokensForLLMProvider])
 
   // Optimize prompt handler
   const handleOptimize = useCallback(async () => {
@@ -347,9 +408,14 @@ export function useImageGenerator() {
         {
           prompt,
           provider: llmSettings.llmProvider,
-          model: llmSettings.llmModel,
+          model:
+            llmSettings.llmProvider === 'custom'
+              ? llmSettings.customOptimizeConfig.model
+              : llmSettings.llmModel,
           lang: 'en',
           systemPrompt: getEffectiveSystemPrompt(llmSettings.customSystemPrompt),
+          customConfig:
+            llmSettings.llmProvider === 'custom' ? llmSettings.customOptimizeConfig : undefined,
         },
         tokens.length > 0 ? tokens : undefined
       )
@@ -379,7 +445,22 @@ export function useImageGenerator() {
     addStatus('Translating prompt...')
 
     try {
-      const result = await translatePrompt(prompt)
+      const tokens = await getTranslateTokens()
+      const result = await translatePrompt(
+        {
+          prompt,
+          provider: llmSettings.translateProvider,
+          model:
+            llmSettings.translateProvider === 'custom'
+              ? llmSettings.customTranslateConfig.model
+              : llmSettings.translateModel,
+          customConfig:
+            llmSettings.translateProvider === 'custom'
+              ? llmSettings.customTranslateConfig
+              : undefined,
+        },
+        tokens.length > 0 ? tokens : undefined
+      )
 
       if (result.success) {
         setPrompt(result.data.translated)
@@ -396,7 +477,7 @@ export function useImageGenerator() {
     } finally {
       setIsTranslating(false)
     }
-  }, [prompt, isTranslating, addStatus])
+  }, [prompt, isTranslating, llmSettings, getTranslateTokens, addStatus])
 
   return {
     // State
@@ -437,8 +518,12 @@ export function useImageGenerator() {
     // LLM Setters
     setLLMProvider,
     setLLMModel,
+    setTranslateProvider,
+    setTranslateModel,
     setAutoTranslate,
     setCustomSystemPrompt,
+    setCustomOptimizeConfig,
+    setCustomTranslateConfig,
     // Handlers
     saveToken,
     handleRatioSelect,

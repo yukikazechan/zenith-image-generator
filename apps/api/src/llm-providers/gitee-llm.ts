@@ -50,6 +50,7 @@ export class GiteeLLMProvider implements LLMProvider {
           { role: 'user', content: request.prompt },
         ],
         max_tokens: request.maxTokens || 1000,
+        temperature: request.temperature ?? 0.7,
         stream: false,
       }),
     })

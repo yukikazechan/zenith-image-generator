@@ -9,6 +9,17 @@ export type LLMProviderType =
   | 'gitee-llm'
   | 'modelscope-llm'
   | 'deepseek'
+  | 'custom'
+
+/** Custom OpenAI-compatible provider configuration */
+export interface CustomLLMConfig {
+  /** API base URL (e.g., https://api.openai.com/v1) */
+  baseUrl: string
+  /** API key */
+  apiKey: string
+  /** Model name */
+  model: string
+}
 
 /** LLM Model configuration */
 export interface LLMModelConfig {
@@ -50,6 +61,8 @@ export interface OptimizeRequest {
   model?: string
   /** Custom system prompt */
   systemPrompt?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
 }
 
 /** Prompt optimize success response */
@@ -79,12 +92,20 @@ export interface OptimizeErrorResponse {
 export interface TranslateRequest {
   /** The prompt to translate (Chinese to English) */
   prompt: string
+  /** LLM provider to use (default: pollinations) */
+  provider?: LLMProviderType
+  /** Specific model to use */
+  model?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
 }
 
 /** Prompt translate success response */
 export interface TranslateResponse {
   /** The translated prompt */
   translated: string
+  /** Provider used */
+  provider: LLMProviderType
   /** Model used */
   model: string
 }

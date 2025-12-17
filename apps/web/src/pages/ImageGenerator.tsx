@@ -1,12 +1,13 @@
-import { ApiConfigAccordion } from '@/components/feature/ApiConfigAccordion'
+import { useState } from 'react'
 import { Header } from '@/components/feature/Header'
 import { ImageResultCard } from '@/components/feature/ImageResultCard'
-import { LLMSettingsAccordion } from '@/components/feature/LLMSettingsAccordion'
 import { PromptCard } from '@/components/feature/PromptCard'
+import { SettingsModal } from '@/components/feature/SettingsModal'
 import { StatusCard } from '@/components/feature/StatusCard'
 import { useImageGenerator } from '@/hooks/useImageGenerator'
 
 export default function ImageGenerator() {
+  const [showSettings, setShowSettings] = useState(false)
   const {
     tokens,
     currentToken,
@@ -42,8 +43,12 @@ export default function ImageGenerator() {
     setIsBlurred,
     setLLMProvider,
     setLLMModel,
+    setTranslateProvider,
+    setTranslateModel,
     setAutoTranslate,
     setCustomSystemPrompt,
+    setCustomOptimizeConfig,
+    setCustomTranslateConfig,
     saveToken,
     handleRatioSelect,
     handleUhdToggle,
@@ -59,29 +64,11 @@ export default function ImageGenerator() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          <Header />
+          <Header onSettingsClick={() => setShowSettings(true)} hasToken={!!currentToken} />
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Left Panel - Controls */}
             <div className="lg:col-span-3 space-y-4">
-              <ApiConfigAccordion
-                provider={provider}
-                model={model}
-                currentToken={currentToken}
-                availableModels={availableModels}
-                setProvider={setProvider}
-                setModel={setModel}
-                saveToken={saveToken}
-              />
-
-              <LLMSettingsAccordion
-                llmSettings={llmSettings}
-                setLLMProvider={setLLMProvider}
-                setLLMModel={setLLMModel}
-                setAutoTranslate={setAutoTranslate}
-                setCustomSystemPrompt={setCustomSystemPrompt}
-              />
-
               <PromptCard
                 prompt={prompt}
                 negativePrompt={negativePrompt}
@@ -129,6 +116,27 @@ export default function ImageGenerator() {
           </div>
         </div>
       </div>
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        provider={provider}
+        model={model}
+        currentToken={currentToken}
+        availableModels={availableModels}
+        setProvider={setProvider}
+        setModel={setModel}
+        saveToken={saveToken}
+        llmSettings={llmSettings}
+        setLLMProvider={setLLMProvider}
+        setLLMModel={setLLMModel}
+        setTranslateProvider={setTranslateProvider}
+        setTranslateModel={setTranslateModel}
+        setAutoTranslate={setAutoTranslate}
+        setCustomSystemPrompt={setCustomSystemPrompt}
+        setCustomOptimizeConfig={setCustomOptimizeConfig}
+        setCustomTranslateConfig={setCustomTranslateConfig}
+      />
     </div>
   )
 }

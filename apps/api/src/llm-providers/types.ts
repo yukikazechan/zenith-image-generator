@@ -14,6 +14,8 @@ export interface LLMCompleteRequest {
   authToken?: string
   /** Max tokens to generate */
   maxTokens?: number
+  /** Temperature for generation (0-1, lower = more deterministic) */
+  temperature?: number
 }
 
 /** LLM completion result */
