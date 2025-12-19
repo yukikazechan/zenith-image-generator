@@ -240,6 +240,8 @@ export function useImageGenerator() {
       if (details.url.includes('.hf.space') && details.url.startsWith('http')) {
         try {
           addStatus('Caching image...')
+          // Preserve original URL for upscale operations
+          details.originalUrl = details.url
           // Use proxy to bypass CORS in production
           const apiUrl = import.meta.env.VITE_API_URL || ''
           const proxyUrl = `${apiUrl}/api/proxy-image?url=${encodeURIComponent(details.url)}`

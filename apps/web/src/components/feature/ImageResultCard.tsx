@@ -93,9 +93,19 @@ export function ImageResultCard({
   const handleUpscaleWithCompare = async () => {
     if (!currentImageUrl || isUpscaling || isImageUpscaled) return
 
+    // Use originalUrl for upscale API (works with external services)
+    // Fall back to currentImageUrl if originalUrl is not available
+    const upscaleUrl = imageDetails?.originalUrl || currentImageUrl
+
+    // Check if URL is valid for upscale (must be http/https, not blob)
+    if (upscaleUrl.startsWith('blob:')) {
+      toast.error('Cannot upscale cached image. Please regenerate the image.')
+      return
+    }
+
     setIsUpscalingLocal(true)
     try {
-      const result = await upscaleImage(currentImageUrl, 4)
+      const result = await upscaleImage(upscaleUrl, 4)
 
       if (result.success && result.data.url) {
         setTempUpscaledUrl(result.data.url)
@@ -295,11 +305,10 @@ export function ImageResultCard({
                       type="button"
                       onClick={() => setShowInfo(!showInfo)}
                       title={t('result.details')}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        showInfo
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${showInfo
                           ? 'bg-orange-600 text-white'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       <Info className="w-5 h-5" />
                     </button>
@@ -309,11 +318,10 @@ export function ImageResultCard({
                       type="button"
                       onClick={() => setIsBlurred(!isBlurred)}
                       title={t('result.toggleBlur')}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        isBlurred
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${isBlurred
                           ? 'text-orange-400 bg-white/10'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       {isBlurred ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -338,11 +346,10 @@ export function ImageResultCard({
                               : t('result.showVideo')
                             : t('result.generateVideo')
                       }
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        videoState.status === 'success'
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${videoState.status === 'success'
                           ? 'text-green-400 bg-green-500/10'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       {videoState.status === 'generating' || videoState.status === 'polling' ? (
                         <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
@@ -493,9 +500,8 @@ export function ImageResultCard({
                 <img
                   src={currentImageUrl}
                   alt="Preview"
-                  className={`max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl transition-[filter] duration-300 select-none ${
-                    isBlurred ? 'blur-xl' : ''
-                  }`}
+                  className={`max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl transition-[filter] duration-300 select-none ${isBlurred ? 'blur-xl' : ''
+                    }`}
                   draggable={false}
                 />
               </motion.div>
@@ -542,11 +548,10 @@ export function ImageResultCard({
                       type="button"
                       onClick={() => setShowInfo(!showInfo)}
                       title={t('result.details')}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        showInfo
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${showInfo
                           ? 'bg-orange-600 text-white'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       <Info className="w-5 h-5" />
                     </button>
@@ -593,11 +598,10 @@ export function ImageResultCard({
                             ? t('result.alreadyUpscaled')
                             : t('result.upscale4x')
                       }
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        isImageUpscaled
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${isImageUpscaled
                           ? 'text-orange-400 bg-orange-500/10'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      } disabled:cursor-not-allowed`}
+                        } disabled:cursor-not-allowed`}
                     >
                       {isUpscaling ? (
                         <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
@@ -612,11 +616,10 @@ export function ImageResultCard({
                       type="button"
                       onClick={() => setIsBlurred(!isBlurred)}
                       title={t('result.toggleBlur')}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                        isBlurred
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${isBlurred
                           ? 'text-orange-400 bg-white/10'
                           : 'text-white/70 hover:text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       {isBlurred ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>

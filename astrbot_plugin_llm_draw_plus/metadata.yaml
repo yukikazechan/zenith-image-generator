@@ -1,0 +1,6 @@
+name: ai自主绘图 # 这是你的插件的唯一识别名。
+desc: 使用 SiliconFlow API (Flux) 或 Google Gemini API 让 LLM 帮你画图 # 插件简短描述
+help: 用自然语言描述你想画的画，bot会自主选择 Flux 或 Gemini 给你画画 # 插件的帮助信息
+version: v0.0.4 # 插件版本号。格式：v1.1.1 或者 v1.1
+author: gemini3pro # 作者
+repo:  # 插件的仓库地址

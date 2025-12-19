@@ -30,6 +30,8 @@ export interface GenerateRequest {
 export interface ImageDetails {
   /** Image URL */
   url: string
+  /** Original image URL (preserved for upscale when url is blob) */
+  originalUrl?: string
   /** Provider name */
   provider: string
   /** Model name */
@@ -47,6 +49,7 @@ export interface ImageDetails {
   /** Negative prompt */
   negativePrompt: string
 }
+
 
 /** Image generation response (success) */
 export interface GenerateSuccessResponse {

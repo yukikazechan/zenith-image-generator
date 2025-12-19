@@ -1,0 +1,231 @@
+{
+    "google_api_key": {
+        "description": "Google API 密钥 (用于 /nano 和 /nanopro 官方调用)",
+        "type": "string",
+        "hint": "请前往 https://aistudio.google.com/app/apikey 获取 API Key。用于 /nano 和 /nanopro 命令。",
+        "default": "",
+        "obvious_hint": false
+    },
+    "group_white_list": {
+        "description": "群组白名单 (群组ID列表)",
+        "type": "list",
+        "default": [],
+        "hint": "填写允许使用生图功能的群组ID。若所有白名单(群组/用户)均为空，则无限制。"
+    },
+    "user_white_list": {
+        "description": "用户白名单 (用户ID列表)",
+        "type": "list",
+        "default": [],
+        "hint": "填写允许使用生图功能的用户ID (支持私聊和群聊)。"
+    },
+    "ignore_at_qq_list": {
+        "description": "忽略作为参考图的At用户QQ列表",
+        "type": "list",
+        "default": [],
+        "hint": "在此列表中的QQ号如果被@，将不会被提取头像作为画图参考（例如填写Bot机器人的QQ号）。"
+    },
+    "openai_api_url": {
+        "description": "OpenAI 兼容 API 地址 (用于 /生图 和 /生图pro)",
+        "type": "string",
+        "default": "http://localhost:8317/v1/chat/completions",
+        "hint": "OpenAI 兼容接口地址"
+    },
+    "openai_api_tokens": {
+        "description": "OpenAI 兼容 API Token 列表",
+        "type": "list",
+        "default": [],
+        "hint": "配置多个 Token 以实现轮询。用于 /生图 和 /生图pro。"
+    },
+    "flow_api_url": {
+        "description": "Flow2API 地址 (用于 /flow, /flowpro 和 /生视频)",
+        "type": "string",
+        "default": "http://localhost:8317/v1/chat/completions",
+        "hint": "Flow2API 接口地址"
+    },
+    "flow_api_tokens": {
+        "description": "Flow2API Token 列表",
+        "type": "list",
+        "default": [],
+        "hint": "配置多个 Token 以实现轮询。用于 /flow, /flowpro 和 /生视频。"
+    },
+    "openai_model": {
+        "description": "生图模型名称 (/生图)",
+        "type": "string",
+        "default": "gemini-2.5-flash-image",
+        "hint": "/生图 命令使用的模型名称 (OpenAI Compatible)"
+    },
+    "openai_normal_enable_ar": {
+        "description": "/生图 是否支持 AR",
+        "type": "bool",
+        "default": true
+    },
+    "openai_normal_allowed_ars": {
+        "description": "/生图 支持的 AR 列表",
+        "type": "list",
+        "default": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+        ]
+    },
+    "openai_normal_enable_res": {
+        "description": "/生图 是否支持分辨率",
+        "type": "bool",
+        "default": false
+    },
+    "openai_normal_allowed_res": {
+        "description": "/生图 支持的分辨率列表",
+        "type": "list",
+        "default": [
+            "1k",
+            "2k",
+            "4k"
+        ],
+        "hint": "Gemini 官方接口通常不支持自定义分辨率，建议关闭"
+    },
+    "openai_pro_model": {
+        "description": "生图Pro模型名称 (/生图pro)",
+        "type": "string",
+        "default": "gemini-3-pro-image-preview",
+        "hint": "/生图pro 命令使用的模型名称 (OpenAI Compatible)"
+    },
+    "openai_pro_enable_ar": {
+        "description": "/生图pro 是否支持 AR",
+        "type": "bool",
+        "default": true
+    },
+    "openai_pro_allowed_ars": {
+        "description": "/生图pro 支持的 AR 列表",
+        "type": "list",
+        "default": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+        ]
+    },
+    "openai_pro_enable_res": {
+        "description": "/生图pro 是否支持分辨率",
+        "type": "bool",
+        "default": true
+    },
+    "openai_pro_allowed_res": {
+        "description": "/生图pro 支持的分辨率列表",
+        "type": "list",
+        "default": [
+            "1k",
+            "2k",
+            "4k"
+        ],
+        "hint": "支持 1K, 2K, 4K"
+    },
+    "nano_model": {
+        "description": "Nano 模型名称 (/nano)",
+        "type": "string",
+        "default": "gemini-2.5-flash-image",
+        "hint": "/nano 命令使用的模型名称 (官方 API)"
+    },
+    "nano_normal_enable_ar": {
+        "description": "/nano 是否支持 AR",
+        "type": "bool",
+        "default": true
+    },
+    "nano_normal_allowed_ars": {
+        "description": "/nano 支持的 AR 列表",
+        "type": "list",
+        "default": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+        ]
+    },
+    "nano_normal_enable_res": {
+        "description": "/nano 是否支持分辨率",
+        "type": "bool",
+        "default": false
+    },
+    "nano_normal_allowed_res": {
+        "description": "/nano 支持的分辨率列表",
+        "type": "list",
+        "default": [
+            "1k",
+            "2k",
+            "4k"
+        ],
+        "hint": "Gemini 官方接口通常不支持自定义分辨率，建议关闭"
+    },
+    "nanopro_model": {
+        "description": "Nano Pro 模型名称 (/nanopro)",
+        "type": "string",
+        "default": "gemini-3.0-pro-image",
+        "hint": "/nanopro 命令使用的模型名称 (官方 API)"
+    },
+    "nano_pro_enable_ar": {
+        "description": "/nanopro 是否支持 AR",
+        "type": "bool",
+        "default": true
+    },
+    "nano_pro_allowed_ars": {
+        "description": "/nanopro 支持的 AR 列表",
+        "type": "list",
+        "default": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+        ]
+    },
+    "nano_pro_enable_res": {
+        "description": "/nanopro 是否支持分辨率",
+        "type": "bool",
+        "default": true
+    },
+    "nano_pro_allowed_res": {
+        "description": "/nanopro 支持的分辨率列表",
+        "type": "list",
+        "default": [
+            "1k",
+            "2k",
+            "4k"
+        ],
+        "hint": "支持 1K, 2K, 4K"
+    },
+    "flow_model": {
+        "description": "Flow 模型名称 (/flow)",
+        "type": "string",
+        "default": "gemini-2.5-flash-image",
+        "hint": "/flow 命令使用的模型名称 (Flow Suffixes)"
+    },
+    "flowpro_model": {
+        "description": "Flow Pro 模型名称 (/flowpro)",
+        "type": "string",
+        "default": "gemini-3.0-pro-image",
+        "hint": "/flowpro 命令使用的模型名称 (Flow Suffixes)"
+    }
+}
